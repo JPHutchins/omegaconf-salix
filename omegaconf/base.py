@@ -2,7 +2,6 @@ import copy
 import sys
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
@@ -54,12 +53,22 @@ from .errors import (
 from .grammar_parser import parse
 from .grammar_visitor import GrammarVisitor
 from .typing import Antlr4ParserRuleContext
+from salix import Struct, set_field
 
 DictKeyType = Union[str, bytes, int, Enum, float, bool]
 
 
-@dataclass
-class Metadata:
+def _rebuild_metadata(cls_path: Tuple[str, str], state: Dict[str, Any]) -> "Metadata":
+    module, qualname = cls_path
+    cls: Any = sys.modules[module]
+    for part in qualname.split("."):
+        cls = getattr(cls, part)
+    obj = cls(**state)
+    obj.__setstate__(state)
+    return obj
+
+
+class Metadata(Struct, frozen=False):
     ref_type: Union[Type[Any], Any]
 
     object_type: Union[Type[Any], Any]
@@ -78,11 +87,26 @@ class Metadata:
     # otherwise, the parent node is queried.
     flags_root: bool = False
 
-    resolver_cache: Dict[str, Any] = field(default_factory=lambda: defaultdict(dict))
+    resolver_cache: Optional[Dict[str, Any]] = None
+
+    def __getstate__(self) -> Dict[str, Any]:
+        return {name: getattr(self, name) for name in type(self).__struct_fields__}
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        for name, value in state.items():
+            set_field(self, name, value)
+
+    def __reduce__(self) -> Any:
+        return (
+            _rebuild_metadata,
+            ((type(self).__module__, type(self).__qualname__), self.__getstate__()),
+        )
 
     def __post_init__(self) -> None:
         if self.flags is None:
             self.flags = {}
+        if self.resolver_cache is None:
+            self.resolver_cache = defaultdict(dict)
 
     @property
     def type_hint(self) -> Union[Type[Any], Any]:
@@ -96,8 +120,7 @@ class Metadata:
             return self.ref_type
 
 
-@dataclass
-class ContainerMetadata(Metadata):
+class ContainerMetadata(Metadata, frozen=False):
     key_type: Any = None
     element_type: Any = None
 
@@ -113,6 +136,8 @@ class ContainerMetadata(Metadata):
 
         if self.flags is None:
             self.flags = {}
+        if self.resolver_cache is None:
+            self.resolver_cache = defaultdict(dict)
 
 
 class Node(ABC):
