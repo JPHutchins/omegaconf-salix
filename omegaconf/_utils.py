@@ -676,6 +676,67 @@ def get_dataclass_data(
     return d
 
 
+def get_struct_data(
+    obj: Any,
+    allow_objects: Optional[bool] = None,
+    parent: Optional["BaseContainer"] = None,
+) -> Dict[str, Any]:
+    from omegaconf.base import Node
+    from omegaconf.omegaconf import MISSING, OmegaConf, _maybe_wrap
+
+    flags = {"allow_objects": allow_objects} if allow_objects is not None else {}
+    d = {}
+    is_type = isinstance(obj, type)
+    obj_type = get_type_of(obj)
+    dummy_parent = OmegaConf.create({}, flags=flags)
+    dummy_parent._metadata.object_type = obj_type
+    if parent is not None:
+        dummy_parent._set_key(parent._key())
+        dummy_parent._set_parent(parent._get_parent())
+    names = obj_type.__struct_fields__  # type: ignore
+    annotations = obj_type.__struct_annotations__  # type: ignore
+    defaults = obj_type.__struct_defaults__  # type: ignore
+    resolved_hints = get_type_hints(obj_type)
+    missing = len(names) - len(defaults)
+    for position, name in enumerate(names):
+        is_optional, type_ = _resolve_optional(
+            resolved_hints.get(name, annotations[position])
+        )
+        type_ = _resolve_forward(type_, obj.__module__)
+
+        if not is_type:
+            value = getattr(obj, name)
+        elif position < missing:
+            value = MISSING
+        else:
+            value = defaults[position - missing]
+        if isinstance(value, Node):
+            value = copy.deepcopy(value)
+
+        if is_union_annotation(type_) and not is_supported_union_annotation(type_):
+            e = ConfigValueError(
+                f"Unsupported type annotation in Union:\n{name}: {type_str(type_)}"  # noqa: E231
+            )
+            format_and_raise(node=None, key=None, value=value, cause=e, msg=str(e))
+        try:
+            d[name] = _maybe_wrap(
+                ref_type=type_,
+                is_optional=is_optional,
+                key=name,
+                value=value,
+                parent=dummy_parent,
+            )
+        except (ValidationError, GrammarParseError) as ex:
+            format_and_raise(
+                node=dummy_parent, key=name, value=value, cause=ex, msg=str(ex)
+            )
+        d[name]._set_parent(None)
+    dict_subclass_data = extract_dict_subclass_data(obj=obj, parent=dummy_parent)
+    if dict_subclass_data is not None:
+        d.update(dict_subclass_data)
+    return d
+
+
 def is_dataclass(obj: Any) -> bool:
     from omegaconf.base import Node
 
@@ -694,8 +755,17 @@ def is_attr_class(obj: Any) -> bool:
     return attr.has(obj)
 
 
+def is_struct(obj: Any) -> bool:
+    from omegaconf.base import Node
+
+    if isinstance(obj, Node):
+        return False
+    cls = obj if isinstance(obj, type) else type(obj)
+    return hasattr(cls, "__struct_fields__")
+
+
 def is_structured_config(obj: Any) -> bool:
-    return is_attr_class(obj) or is_dataclass(obj)
+    return is_attr_class(obj) or is_dataclass(obj) or is_struct(obj)
 
 
 def is_dataclass_frozen(type_: Any) -> bool:
@@ -707,6 +777,10 @@ def is_attr_frozen(type_: type) -> bool:
     # Unfortunately currently there isn't an official API in attr that can detect that.
     # noinspection PyProtectedMember
     return type_.__setattr__ == attr._make._frozen_setattrs  # type: ignore
+
+
+def is_struct_frozen(type_: type) -> bool:
+    return type_.__setattr__ is not object.__setattr__
 
 
 def get_type_of(class_or_object: Any) -> Type[Any]:
@@ -724,6 +798,8 @@ def is_structured_config_frozen(obj: Any) -> bool:
         return is_dataclass_frozen(type_)
     if is_attr_class(type_):
         return is_attr_frozen(type_)
+    if is_struct(type_):
+        return is_struct_frozen(type_)
     return False
 
 
@@ -746,6 +822,9 @@ def get_structured_config_init_field_aliases(obj: Any) -> Dict[str, str]:
     elif is_attr_class(obj):
         fields = get_attr_class_fields(obj)
         return {f.name: _find_attrs_init_field_alias(f) for f in fields if f.init}
+    elif is_struct(obj):
+        cls = get_type_of(obj)
+        return {name: name for name in cls.__struct_fields__}  # type: ignore
     else:
         raise ValueError(f"Unsupported type: {type(obj).__name__}")
 
@@ -759,6 +838,8 @@ def get_structured_config_data(
         return get_dataclass_data(obj, allow_objects=allow_objects, parent=parent)
     elif is_attr_class(obj):
         return get_attr_data(obj, allow_objects=allow_objects, parent=parent)
+    elif is_struct(obj):
+        return get_struct_data(obj, allow_objects=allow_objects, parent=parent)
     else:
         raise ValueError(f"Unsupported type: {type(obj).__name__}")
 
