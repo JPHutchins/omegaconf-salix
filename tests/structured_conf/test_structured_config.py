@@ -1,4 +1,3 @@
-import dataclasses
 import inspect
 import pathlib
 import re
@@ -11,6 +10,7 @@ from types import LambdaType
 from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from pytest import fixture, mark, param, raises
+from salix import Struct
 
 from omegaconf import (
     MISSING,
@@ -34,33 +34,18 @@ from omegaconf.errors import (
 from tests import Color, Enum1, User, warns_dict_subclass_deprecated
 
 
-@fixture(
-    params=[
-        param("tests.structured_conf.data.dataclasses", id="dataclasses"),
-        param(
-            "tests.structured_conf.data.dataclasses_pre_311",
-            id="dataclasses_pre_311",
-            marks=mark.skipif(
-                sys.version_info >= (3, 11),
-                reason="python >= 3.11 does not support mutable default dataclass arguments",
-            ),
-        ),
-        param("tests.structured_conf.data.attr_classes", id="attr_classes"),
-    ],
-)
+@fixture(params=[param("tests.structured_conf.data.structs", id="structs")])
 def module(request: Any) -> Any:
     return import_module(request.param)
 
 
-@dataclasses.dataclass
-class ForwardRefListTree:
+class ForwardRefListTree(Struct, frozen=False):
     value: int = -1
     children: Optional[list["ForwardRefListTree"]] = None
 
 
 class DottedForwardRefListTree:
-    @dataclasses.dataclass
-    class Node:
+    class Node(Struct, frozen=False):
         value: int = -1
         children: Optional[list["DottedForwardRefListTree.Node"]] = None
 
@@ -68,23 +53,19 @@ class DottedForwardRefListTree:
 T = TypeVar("T")
 
 
-@dataclasses.dataclass
-class GenericBase(Generic[T]):
+class GenericBase(Struct, Generic[T], frozen=False):
     x: int = 1
 
 
-@dataclasses.dataclass
-class GenericDerived(GenericBase[int]):
+class GenericDerived(GenericBase[int], frozen=False):
     pass
 
 
-@dataclasses.dataclass
-class GenericValueBase(Generic[T]):
+class GenericValueBase(Struct, Generic[T], frozen=False):
     x: T = MISSING  # type: ignore[assignment]
 
 
-@dataclasses.dataclass
-class GenericValueDerived(GenericValueBase[int]):
+class GenericValueDerived(GenericValueBase[int], frozen=False):
     x: int = 1
 
 
@@ -107,14 +88,12 @@ class EnumConfigAssignments:
 
 
 def test_string_valued_enum_assignment_by_member_name_and_value() -> None:
-    from dataclasses import dataclass
 
     class Height(str, Enum):
         SHORT = "short-value"
         TALL = "very-tall-value"
 
-    @dataclass
-    class HeightConfig:
+    class HeightConfig(Struct, frozen=False):
         height: Height = Height.SHORT
 
     cfg = OmegaConf.structured(HeightConfig)
@@ -502,13 +481,9 @@ class TestConfigs:
     @mark.parametrize(
         "input_init, expected_init",
         [
-            # attr class as class
+            # Struct as class
             (None, {}),
-            # attr class object with custom values
-            ({"int_default": 30}, {"int_default": 30}),
-            # dataclass as class
-            (None, {}),
-            # dataclass as object with custom values
+            # Struct as object with custom values
             ({"int_default": 30}, {"int_default": 30}),
         ],
     )
@@ -1043,9 +1018,8 @@ class TestConfigs:
         assert OmegaConf.get_type(conf) == module.BoolConfig
         assert conf.with_default is False
 
-    def test_promote_to_dataclass(self, module: Any) -> None:
-        @dataclasses.dataclass
-        class Foo:
+    def test_promote_to_struct(self, module: Any) -> None:
+        class Foo(Struct, frozen=False):
             foo: pathlib.Path
             bar: str
             qub: int = 5
@@ -1059,7 +1033,7 @@ class TestConfigs:
         assert isinstance(x.bar, str)
         assert x.qub == 5
 
-    def test_set_key_with_with_dataclass(self, module: Any) -> None:
+    def test_set_key_with_struct(self, module: Any) -> None:
         cfg = OmegaConf.create({"foo": [1, 2]})
         cfg.foo = module.ListClass()
 
@@ -1532,22 +1506,6 @@ class TestConfigs2:
         c3 = OmegaConf.merge(c1, c2)
         with raises(ValidationError):
             c3.missing.append("xx")
-
-    def test_ignore_metadata_class_with_required_args(self, module: Any) -> None:
-        cfg = OmegaConf.create(module.HasIgnoreMetadataRequired)
-        assert cfg == {"no_ignore": "???"}
-
-    def test_ignore_metadata_instance_with_required_args(self, module: Any) -> None:
-        cfg = OmegaConf.create(module.HasIgnoreMetadataRequired(3, 4))
-        assert cfg == {"no_ignore": 4}
-
-    def test_ignore_metadata_class_with_default_args(self, module: Any) -> None:
-        cfg = OmegaConf.create(module.HasIgnoreMetadataWithDefault)
-        assert cfg == {"no_ignore": 2}
-
-    def test_ignore_metadata_instance_with_default_args(self, module: Any) -> None:
-        cfg = OmegaConf.create(module.HasIgnoreMetadataWithDefault(3, 4))
-        assert cfg == {"no_ignore": 4}
 
 
 class TestStructredConfigInheritance:
@@ -2122,9 +2080,11 @@ class TestUnionsOfPrimitiveTypes:
         expected: Any,
         type_hint_checks: List[Tuple[Callable[[Any], Any], Any, Any]],
     ) -> None:
-        HasUnion = dataclasses.make_dataclass(
+        HasUnion = type(
             "HasUnion",
-            [("z", container_type, dataclasses.field(default_factory=default_factory))],
+            (Struct,),
+            {"__annotations__": {"z": container_type}, "z": default_factory()},
+            frozen=False,
         )
 
         merged = OmegaConf.merge(OmegaConf.structured(HasUnion), {"z": merge_value})
@@ -2645,16 +2605,12 @@ class TestStructuredConfigValidationInNewNestedContainers:
     def test_merge_new_nested_list_item_of_structured_config_rejects_unknown_key(
         self,
     ) -> None:
-        @dataclasses.dataclass
-        class Foo:
+        class Foo(Struct, frozen=False):
             exist1: int
             exist2: str
 
-        @dataclasses.dataclass
-        class BaseStructure:
-            z: Dict[str, List[Foo]] = dataclasses.field(
-                default_factory=lambda: {"a": [Foo(1, "lol")]}
-            )
+        class BaseStructure(Struct, frozen=False):
+            z: Dict[str, List[Foo]] = {"a": [Foo(1, "lol")]}
 
         with raises(ConfigKeyError):
             OmegaConf.merge(

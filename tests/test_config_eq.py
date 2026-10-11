@@ -1,8 +1,7 @@
-from dataclasses import dataclass, field
 from typing import Any, List
 
-import attr
 from pytest import mark, param
+from salix import Struct
 
 from omegaconf import MISSING, AnyNode, DictConfig, ListConfig, OmegaConf
 from tests import Group, User
@@ -309,53 +308,23 @@ def test_structural_equality_does_not_resolve_missing_interpolation() -> None:
     assert OmegaConf.structural_equality(cfg1, cfg2)
 
 
-def test_structural_equality_dataclass_structured_configs() -> None:
-    @dataclass
-    class Level3:
+def test_structural_equality_struct_structured_configs() -> None:
+    class Level3(Struct, frozen=False):
         value: int = 10
         raw: str = "${target}"
         missing: str = MISSING
 
-    @dataclass
-    class Level2:
-        child: Level3 = field(default_factory=Level3)
-        values: List[int] = field(default_factory=lambda: [1, 2, 3])
+    class Level2(Struct, frozen=False):
+        child: Level3 = Level3()
+        values: List[int] = [1, 2, 3]
 
-    @dataclass
-    class Level1:
-        child: Level2 = field(default_factory=Level2)
+    class Level1(Struct, frozen=False):
+        child: Level2 = Level2()
         target: int = 10
 
     cfg1 = OmegaConf.structured(Level1(target=10))
     cfg2 = OmegaConf.structured(Level1(target=20))
     cfg3 = OmegaConf.structured(Level1(child=Level2(child=Level3(value=20)), target=10))
-
-    assert OmegaConf.structural_equality(cfg1.child, cfg2.child)
-    assert OmegaConf.structural_equality(cfg1.child.child, cfg2.child.child)
-    assert not OmegaConf.structural_equality(cfg1, cfg2)
-    assert not OmegaConf.structural_equality(cfg1, cfg3)
-
-
-def test_structural_equality_attrs_structured_configs() -> None:
-    @attr.s(auto_attribs=True)
-    class Level3:
-        value: int = 10
-        raw: str = "${target}"
-        missing: str = MISSING
-
-    @attr.s(auto_attribs=True)
-    class Level2:
-        child: Level3 = attr.ib(factory=Level3)
-        values: List[int] = attr.ib(factory=lambda: [1, 2, 3])
-
-    @attr.s(auto_attribs=True)
-    class Level1:
-        child: Level2 = attr.ib(factory=Level2)
-        target: int = 10
-
-    cfg1 = OmegaConf.structured(Level1(target=10))
-    cfg2 = OmegaConf.structured(Level1(target=20))
-    cfg3 = OmegaConf.structured(Level1(child=Level2(child=Level3(value=20))))
 
     assert OmegaConf.structural_equality(cfg1.child, cfg2.child)
     assert OmegaConf.structural_equality(cfg1.child.child, cfg2.child.child)
@@ -410,13 +379,11 @@ def test_structural_equality_custom_resolvers_are_not_called_in_structured_confi
 
     OmegaConf.register_resolver("fail_if_called", fail_if_called)
 
-    @dataclass
-    class Child:
+    class Child(Struct, frozen=False):
         value: str = "${fail_if_called:}"
 
-    @dataclass
-    class Parent:
-        child: Child = field(default_factory=Child)
+    class Parent(Struct, frozen=False):
+        child: Child = Child()
         other: int = 10
 
     cfg1 = OmegaConf.structured(Parent(other=10))

@@ -1,14 +1,13 @@
-from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
 from pytest import raises
+from salix import Struct
 
 from omegaconf import MISSING, DictConfig, Node, OmegaConf, TupleConfig, read_write
 from omegaconf.errors import ConfigTypeError, InterpolationToMissingValueError
 
 
-@dataclass
-class TupleObject:
+class TupleObject(Struct, frozen=False):
     values: Tuple[int, str] = (1, "x")
 
 

@@ -2,7 +2,6 @@ import copy
 import re
 import sys
 from contextlib import AbstractContextManager
-from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import (
     Any,
@@ -16,6 +15,7 @@ from typing import (
 )
 
 from pytest import mark, param, raises, warns
+from salix import Struct
 
 from omegaconf import (
     II,
@@ -469,14 +469,12 @@ def test_merge_none_structured_config_root(
 ) -> None:
     class RuntimeObject: ...
 
-    @dataclass
-    class Value:
+    class Value(Struct, frozen=False):
         count: int = 10
         inherited: int = "${..template}"  # type: ignore[assignment]
-        payload: Any = field(default_factory=RuntimeObject)
+        payload: Any = RuntimeObject()
 
-    @dataclass
-    class Config:
+    class Config(Struct, frozen=False):
         template: int = 30
         value: Optional[Value] = None
 
@@ -517,18 +515,15 @@ def test_merge_none_dictconfig_root() -> None:
 
 
 def test_merge_missing_structured_keeps_interpolation_target() -> None:
-    @dataclass
-    class Defaults:
+    class Defaults(Struct, frozen=False):
         value: int = 0
 
-    @dataclass
-    class Child:
+    class Child(Struct, frozen=False):
         ref: Defaults = II("target")
 
-    @dataclass
-    class Parent:
+    class Parent(Struct, frozen=False):
         target: Defaults = MISSING
-        child: Child = field(default_factory=Child)
+        child: Child = Child()
 
     cfg1 = OmegaConf.structured(Parent())
     cfg2 = OmegaConf.structured(Parent())
@@ -547,12 +542,10 @@ def test_merge_missing_structured_keeps_interpolation_target() -> None:
 def test_merge_missing_dict_annotation_keeps_structured_child_ref_types(
     merge: Any,
 ) -> None:
-    @dataclass
-    class HydraConf:
+    class HydraConf(Struct, frozen=False):
         mode: Color = Color.RED
 
-    @dataclass
-    class AppConf:
+    class AppConf(Struct, frozen=False):
         hydra: Dict[str, Any]
 
     cfg = merge(
@@ -1312,9 +1305,8 @@ def test_merge_list_list() -> None:
 
 @mark.parametrize("merge", [OmegaConf.merge, OmegaConf.unsafe_merge])
 def test_merge_nested_list_of_enum_names(merge: Any) -> None:
-    @dataclass
-    class Config:
-        list_list: List[List[Color]] = field(default_factory=lambda: [[Color.RED]])
+    class Config(Struct, frozen=False):
+        list_list: List[List[Color]] = [[Color.RED]]
 
     cfg = merge(Config(), OmegaConf.create({"list_list": [["BLUE"]]}))
 
@@ -1362,12 +1354,10 @@ def test_with_readonly_c1(merge: Any, c1: Any, c2: Any) -> None:
 def test_merge_nested_frozen_structured_config(
     merge: Any, input_unchanged: bool
 ) -> None:
-    @dataclass(frozen=True)
-    class Inner:
+    class Inner(Struct):
         x: int = MISSING
 
-    @dataclass(frozen=True)
-    class Outer:
+    class Outer(Struct):
         inner: Inner = MISSING
         y: int = 1
 
@@ -1754,15 +1744,12 @@ def test_union_operator_ror_list_raises() -> None:
 def test_merge_with_nested_structured_config_and_union_type(
     merge: Any,
 ) -> None:
-    from dataclasses import dataclass
     from typing import Union
 
-    @dataclass
-    class Inner:
+    class Inner(Struct, frozen=False):
         x: Union[int, str]
 
-    @dataclass
-    class Outer:
+    class Outer(Struct, frozen=False):
         inner: Inner
 
     dst = OmegaConf.structured(Outer)
@@ -1782,12 +1769,10 @@ def test_merge_plain_dict_into_structured_config_preserves_list_element_type(
     Regression test for https://github.com/omry/omegaconf/issues/1058.
     """
 
-    @dataclass
-    class Item:
+    class Item(Struct, frozen=False):
         num: int = MISSING
 
-    @dataclass
-    class Config:
+    class Config(Struct, frozen=False):
         aa: List[Item] = MISSING
 
     structured = OmegaConf.structured(Config)
@@ -1810,8 +1795,7 @@ def test_merge_missing_structured_list_type_into_none_or_missing_plain_list(
 ) -> None:
     """A missing structured list source can update metadata without list content."""
 
-    @dataclass
-    class Item:
+    class Item(Struct, frozen=False):
         num: int = MISSING
 
     dest = ListConfig(content=content)
@@ -1829,12 +1813,10 @@ def test_merge_missing_structured_list_type_into_none_or_missing_plain_list(
 def test_merge_missing_structured_list_type_rejects_incompatible_plain_item(
     merge: Any,
 ) -> None:
-    @dataclass
-    class Item:
+    class Item(Struct, frozen=False):
         num: int = MISSING
 
-    @dataclass
-    class Config:
+    class Config(Struct, frozen=False):
         aa: List[Item] = MISSING
 
     with raises(ValidationError):
@@ -1851,13 +1833,11 @@ def test_merge_structured_list_with_content_into_plain_list_preserves_element_ty
     a structured element type with non-MISSING content.
     """
 
-    @dataclass
-    class Item:
+    class Item(Struct, frozen=False):
         num: int = MISSING
 
-    @dataclass
-    class Config:
-        aa: List[Item] = field(default_factory=lambda: [Item(num=42)])
+    class Config(Struct, frozen=False):
+        aa: List[Item] = [Item(num=42)]
 
     structured = OmegaConf.structured(Config)
     plain = OmegaConf.create({"aa": [{"num": 1}, {"num": 2}]})

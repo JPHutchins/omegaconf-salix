@@ -1,12 +1,11 @@
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pytest import raises
+from salix import Struct
 
 from omegaconf import (
     MISSING,
-    DictConfig,
     MissingMandatoryValue,
     OmegaConf,
     ReadonlyConfigError,
@@ -19,8 +18,7 @@ class Height(Enum):
     TALL = 1
 
 
-@dataclass
-class SimpleTypes:
+class SimpleTypes(Struct, frozen=False):
     num: int = 10
     pi: float = 3.1415
     is_awesome: bool = True
@@ -113,8 +111,7 @@ def test_conversions() -> None:
             assert conf.height == expected1
 
 
-@dataclass
-class Modifiers:
+class Modifiers(Struct, frozen=False):
     # regular field
     num: int = 10
 
@@ -146,24 +143,20 @@ def test_modifiers() -> None:
     assert conf.another_num == 42
 
 
-@dataclass
-class User:
+class User(Struct, frozen=False):
     # A simple user class with two missing fields
     name: str = MISSING
     height: Height = MISSING
 
 
 # Group class contains two instances of User.
-@dataclass
-class Group:
+class Group(Struct, frozen=False):
     name: str = MISSING
     # data classes can be nested
     admin: User = User  # type: ignore
 
     # You can also specify different defaults for nested classes
-    manager: User = field(
-        default_factory=lambda: User(name="manager", height=Height.TALL)
-    )
+    manager: User = User(name="manager", height=Height.TALL)
 
 
 def test_nesting() -> None:
@@ -195,14 +188,13 @@ manager:
         conf.manager = {"name": "secret", "height": Height.TALL}
 
 
-@dataclass
-class Lists:
+class Lists(Struct, frozen=False):
     # List with Any as type can take any primitive type OmegaConf supports:
     # int, float, bool, str, bytes and Enums as well as Any (which is the same as not having a specified type).
-    untyped_list: List[Any] = field(default_factory=lambda: [1, "foo", True])
+    untyped_list: List[Any] = [1, "foo", True]
 
     # typed lists can hold int, bool, str, bytes, float or enums.
-    int_list: List[int] = field(default_factory=lambda: [10, 20, 30])
+    int_list: List[int] = [10, 20, 30]
 
 
 def test_typed_list_runtime_validation() -> None:
@@ -221,18 +213,13 @@ def test_typed_list_runtime_validation() -> None:
 
 
 # Dicts
-@dataclass
-class Dicts:
+class Dicts(Struct, frozen=False):
     # Key must be a string or Enum, value can be any primitive type OmegaConf supports:
     # int, float, bool, str, bytes and Enums as well as Any (which is the same as not having a specified type).
-    untyped_dict: Dict[str, Any] = field(
-        default_factory=lambda: {"foo": True, "bar": 100}
-    )
+    untyped_dict: Dict[str, Any] = {"foo": True, "bar": 100}
 
     # maps string to height Enum
-    str_to_height: Dict[str, Height] = field(
-        default_factory=lambda: {"Yoda": Height.SHORT, "3-CPO": Height.TALL}
-    )
+    str_to_height: Dict[str, Height] = {"Yoda": Height.SHORT, "3-CPO": Height.TALL}
 
 
 def test_typed_dict_runtime_validation() -> None:
@@ -245,10 +232,9 @@ def test_typed_dict_runtime_validation() -> None:
 
 
 # Frozen
-@dataclass(frozen=True)
-class FrozenClass:
+class FrozenClass(Struct):
     x: int = 10
-    list: List[int] = field(default_factory=lambda: [1, 2, 3])
+    list: List[int] = [1, 2, 3]
 
 
 def test_frozen() -> None:
@@ -268,23 +254,19 @@ class Protocol(Enum):
     HTTPS = 1
 
 
-@dataclass
-class Domain:
+class Domain(Struct, frozen=False):
     name: str = MISSING
     path: str = MISSING
-    protocols: List[Protocol] = field(default_factory=lambda: [Protocol.HTTPS])
+    protocols: List[Protocol] = [Protocol.HTTPS]
 
 
-@dataclass
-class WebServer(DictConfig):
-    protocol_ports: Dict[Protocol, int] = field(
-        default_factory=lambda: {Protocol.HTTP: 80, Protocol.HTTPS: 443}
-    )
+class WebServer(Struct, frozen=False):
+    protocol_ports: Dict[Protocol, int] = {Protocol.HTTP: 80, Protocol.HTTPS: 443}
     # Dict of name to domain
-    domains: Dict[str, Domain] = field(default_factory=dict)
+    domains: Dict[str, Domain] = {}
 
     # List of all domains
-    domains_list: List[Domain] = field(default_factory=list)
+    domains_list: List[Domain] = []
 
 
 # Test that Enum can be used a dictionary key
@@ -342,11 +324,10 @@ def test_list_of_objects() -> None:
 
 
 def test_merge() -> None:
-    @dataclass
-    class Config:
+    class Config(Struct, frozen=False):
         num: int = 10
-        user: User = field(default_factory=lambda: User(name=MISSING, height=MISSING))
-        domains: Dict[str, Domain] = field(default_factory=dict)
+        user: User = User(name=MISSING, height=MISSING)
+        domains: Dict[str, Domain] = {}
 
     yaml = """
 user:
@@ -376,21 +357,18 @@ domains:
 
 
 def test_merge_example() -> None:
-    @dataclass
-    class Server:
+    class Server(Struct, frozen=False):
         port: int = MISSING
 
-    @dataclass
-    class Log:
+    class Log(Struct, frozen=False):
         file: str = MISSING
         rotation: int = MISSING
 
-    @dataclass
-    class MyConfig:
-        server: Server = field(default_factory=Server)
-        log: Log = field(default_factory=Log)
-        users: List[str] = field(default_factory=list)
-        numbers: List[int] = field(default_factory=list)
+    class MyConfig(Struct, frozen=False):
+        server: Server = Server()
+        log: Log = Log()
+        users: List[str] = []
+        numbers: List[int] = []
 
     schema = OmegaConf.structured(MyConfig)
     with raises(ValidationError):

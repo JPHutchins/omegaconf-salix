@@ -18,7 +18,6 @@ from omegaconf.base import Box
 from tests import (
     Color,
     NestedContainers,
-    PersonA,
     PersonD,
     SubscriptedDict,
     SubscriptedDictOpt,
@@ -150,9 +149,7 @@ class TestSaveLoad:
 @mark.parametrize(
     "input_,resolve,expected,file_class",
     [
-        (PersonA, False, {"age": 18, "registered": True}, str),
         (PersonD, False, {"age": 18, "registered": True}, str),
-        (PersonA(), False, {"age": 18, "registered": True}, str),
         (PersonD(), False, {"age": 18, "registered": True}, str),
     ],
 )

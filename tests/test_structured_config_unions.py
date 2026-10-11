@@ -1,10 +1,9 @@
 import copy
 import pickle
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
-import attr
 from pytest import mark, param, raises
+from salix import Struct
 
 from omegaconf import (
     MISSING,
@@ -17,179 +16,126 @@ from omegaconf import (
 from omegaconf._utils import is_supported_union_annotation
 
 
-@dataclass
-class Animal:
+class Animal(Struct, frozen=False):
     name: str = MISSING
 
 
-@dataclass
-class Dog(Animal):
+class Dog(Animal, frozen=False):
     breed: str = MISSING
 
 
-@dataclass
-class Cat(Animal):
+class Cat(Animal, frozen=False):
     indoor: bool = MISSING
 
 
-@dataclass
-class GuideDog(Dog):
+class GuideDog(Dog, frozen=False):
     trained: bool = True
 
 
-@dataclass
-class Bird(Animal):
+class Bird(Animal, frozen=False):
     can_fly: bool = True
 
 
-@dataclass
-class PetConfig:
+class PetConfig(Struct, frozen=False):
     pet: Union[Dog, Cat] = MISSING
 
 
-@dataclass
-class AnimalOrDogConfig:
+class AnimalOrDogConfig(Struct, frozen=False):
     pet: Union[Animal, Dog] = MISSING
 
 
-@dataclass
-class Pep604PetConfig:
+class Pep604PetConfig(Struct, frozen=False):
     pet: Dog | Cat = MISSING
 
 
-@dataclass
-class PetWithDefaultConfig:
-    pet: Union[Dog, Cat] = field(default_factory=lambda: Dog(name="Rex", breed="Lab"))
+class PetWithDefaultConfig(Struct, frozen=False):
+    pet: Union[Dog, Cat] = Dog(name="Rex", breed="Lab")
 
 
-@dataclass
-class DogOrIntConfig:
+class DogOrIntConfig(Struct, frozen=False):
     pet: Union[Dog, int] = MISSING
 
 
-@dataclass
-class DogOrMappingConfig:
+class DogOrMappingConfig(Struct, frozen=False):
     pet: Union[Dog, Dict[str, Any]] = MISSING
 
 
-@dataclass
-class OptionalPetConfig:
+class OptionalPetConfig(Struct, frozen=False):
     pet: Optional[Union[Dog, Cat]] = None
 
 
-@dataclass(frozen=True)
-class FrozenDog:
+class FrozenDog(Struct):
     name: str = MISSING
     breed: str = MISSING
 
 
-@dataclass
-class FrozenDogOrIntConfig:
+class FrozenDogOrIntConfig(Struct, frozen=False):
     pet: Union[FrozenDog, int] = MISSING
 
 
-@dataclass
-class FlexibleDog:
+class FlexibleDog(Struct, frozen=False):
     name: str = "Rex"
     payload: Any = 10
-    items: List[Any] = field(default_factory=lambda: [10, "text"])
-    metadata: Dict[str, Any] = field(default_factory=lambda: {"count": 1})
+    items: List[Any] = [10, "text"]
+    metadata: Dict[str, Any] = {"count": 1}
 
 
-@dataclass
-class FlexibleDogOrIntConfig:
-    pet: Union[FlexibleDog, int] = field(default_factory=FlexibleDog)
+class FlexibleDogOrIntConfig(Struct, frozen=False):
+    pet: Union[FlexibleDog, int] = FlexibleDog()
 
 
-@dataclass
-class NumericDog:
+class NumericDog(Struct, frozen=False):
     age: int = MISSING
-    scores: List[int] = field(default_factory=list)
+    scores: List[int] = []
 
 
-@dataclass
-class NumericCat:
+class NumericCat(Struct, frozen=False):
     lives: int = 9
 
 
-@dataclass
-class NumericPetConfig:
-    pet: Union[NumericDog, NumericCat] = field(
-        default_factory=lambda: NumericDog(age=5)
-    )
+class NumericPetConfig(Struct, frozen=False):
+    pet: Union[NumericDog, NumericCat] = NumericDog(age=5)
 
 
-@dataclass
-class NumericInterpolationConfig:
+class NumericInterpolationConfig(Struct, frozen=False):
     age_text: str = "10"
-    pet: Union[NumericDog, NumericCat] = field(
-        default_factory=lambda: NumericDog(age="${age_text}")  # type: ignore[arg-type]
-    )
+    pet: Union[NumericDog, NumericCat] = NumericDog(age="${age_text}")
 
 
 def _default_pets() -> List[Union[Dog, Cat]]:
     return [Dog(name="Rex", breed="Lab")]
 
 
-@dataclass
-class PetListConfig:
-    pets: List[Union[Dog, Cat]] = field(default_factory=_default_pets)
+class PetListConfig(Struct, frozen=False):
+    pets: List[Union[Dog, Cat]] = _default_pets()
 
 
-@dataclass
-class PetInterpolationConfig:
-    dog: Dog = field(default_factory=lambda: Dog(name="Rex", breed="Lab"))
+class PetInterpolationConfig(Struct, frozen=False):
+    dog: Dog = Dog(name="Rex", breed="Lab")
     pet: Union[Dog, Cat] = "${dog}"  # type: ignore[assignment]
 
 
-@dataclass
-class Left:
+class Left(Struct, frozen=False):
     left: int = 1
 
 
-@dataclass
-class Right:
-    right: int = 2
+class Right(Struct, frozen=False):
+    pass
 
 
-@dataclass
-class Child(Left, Right):
+class Child(Left, Right, frozen=False):
     child: int = 3
 
 
-@dataclass
-class MultipleInheritanceConfig:
+class MultipleInheritanceConfig(Struct, frozen=False):
     value: Union[Right, Left] = MISSING
-
-
-@attr.s(auto_attribs=True)
-class AttrDog:
-    name: str = MISSING
-    breed: str = MISSING
-
-
-@attr.s(auto_attribs=True)
-class AttrCat:
-    name: str = MISSING
-    indoor: bool = MISSING
-
-
-@attr.s(auto_attribs=True)
-class AttrPetConfig:
-    pet: Union[AttrDog, AttrCat] = MISSING
 
 
 class UnsupportedType:
     pass
 
 
-@dataclass
-class DataclassWithUnsupportedUnion:
-    value: Union[int, UnsupportedType] = 10
-
-
-@attr.s(auto_attribs=True)
-class AttrWithUnsupportedUnion:
+class StructWithUnsupportedUnion(Struct, frozen=False):
     value: Union[int, UnsupportedType] = 10
 
 
@@ -208,7 +154,7 @@ def test_structured_configs_are_supported_union_members() -> None:
 
 @mark.parametrize(
     "schema",
-    [DataclassWithUnsupportedUnion, AttrWithUnsupportedUnion],
+    [StructWithUnsupportedUnion],
 )
 def test_unsupported_union_member_is_rejected(schema: Any) -> None:
     with raises(ValueError, match="Unsupported type annotation in Union"):
@@ -448,7 +394,7 @@ def test_mapping_merge_respects_selected_structured_and_typed_dict_branches() ->
             OmegaConf.structured(PetWithDefaultConfig(pet=Dog(name="Fido"))),
             id="structured-owner",
         ),
-        param({"pet": Dog(name="Fido")}, id="dataclass"),
+        param({"pet": Dog(name="Fido")}, id="struct"),
         param(
             {"pet": OmegaConf.structured(Dog(name="Fido"))},
             id="structured-dictconfig",
@@ -574,15 +520,6 @@ def test_selected_branch_rejects_nonconvertible_field_values() -> None:
 
     with raises(ValidationError):
         cfg.pet.breed = []
-
-
-def test_attrs_structured_union() -> None:
-    cfg = OmegaConf.structured(AttrPetConfig)
-
-    cfg.pet = AttrDog(name="Rex", breed="Lab")
-
-    assert _selected_ref_type(cfg) is AttrDog
-    assert cfg.pet == {"name": "Rex", "breed": "Lab"}
 
 
 def test_to_container_and_to_object() -> None:

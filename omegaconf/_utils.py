@@ -1222,7 +1222,7 @@ def _ensure_container(target: Any) -> Any:
     elif not OmegaConf.is_config(target):
         raise ValueError(
             "Invalid input. Supports one of "
-            + "[dict,list,tuple,DictConfig,ListConfig,TupleConfig,dataclass,dataclass instance,attr class,attr class instance]"
+            + "[dict,list,tuple,DictConfig,ListConfig,TupleConfig,Struct,Struct instance]"
         )
 
     return target

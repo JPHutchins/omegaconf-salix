@@ -1,6 +1,7 @@
 from typing import Any, Union
 
 from pytest import mark, param, raises
+from salix import Struct
 
 from omegaconf import DictConfig, ListConfig, OmegaConf, ValidationError
 from omegaconf._utils import _ensure_container, is_primitive_container
@@ -533,20 +534,16 @@ def test_update_through_none_structured_node() -> None:
 def test_update_through_none_structured_node_nested() -> None:
     # Verify _get_full_key includes the full path to the null node when it is
     # more than one level deep: error should say "a.inner" not just "inner".
-    from dataclasses import dataclass, field
     from typing import Optional
 
-    @dataclass
-    class Inner:
+    class Inner(Struct, frozen=False):
         x: int = 0
 
-    @dataclass
-    class Middle:
+    class Middle(Struct, frozen=False):
         inner: Optional[Inner] = None
 
-    @dataclass
-    class Outer:
-        a: Middle = field(default_factory=Middle)
+    class Outer(Struct, frozen=False):
+        a: Middle = Middle()
 
     cfg = OmegaConf.structured(Outer)
     with raises(

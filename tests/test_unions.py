@@ -1,30 +1,25 @@
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Union
 
 from pytest import mark, param, raises
+from salix import Struct
 
 from omegaconf import OmegaConf, UnionNode, ValidationError
 from omegaconf._utils import _get_value, get_type_hint
 from tests import Color
 
 
-@dataclass
-class LiteralOrIntConfig:
+class LiteralOrIntConfig(Struct, frozen=False):
     value: Union[Literal["auto", "manual"], int] = "auto"
 
 
-@dataclass
-class NoneLiteralOrIntConfig:
+class NoneLiteralOrIntConfig(Struct, frozen=False):
     value: Union[Literal[None], int] = None
-    sequence: List[Union[Literal[None], int]] = field(default_factory=lambda: [None, 1])
-    mapping: Dict[str, Union[Literal[None], int]] = field(
-        default_factory=lambda: {"none": None, "int": 1}
-    )
+    sequence: List[Union[Literal[None], int]] = [None, 1]
+    mapping: Dict[str, Union[Literal[None], int]] = {"none": None, "int": 1}
 
 
-@dataclass
-class AnyOrIntConfig:
+class AnyOrIntConfig(Struct, frozen=False):
     value: Union[Any, int] = 10
 
 

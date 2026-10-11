@@ -2,8 +2,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast
 
-import attr
-from pytest import importorskip
+from salix import Struct
 
 from omegaconf import II, MISSING, SI
 from tests import Color, Enum1
@@ -11,8 +10,9 @@ from tests import Color, Enum1
 if sys.version_info >= (3, 8):  # pragma: no cover
     from typing import TypedDict
 
-# attr is a dependency of pytest which means it's always available when testing with pytest.
-importorskip("attr")
+
+class InstanceDict:
+    pass
 
 
 class NotStructuredConfig:
@@ -28,60 +28,55 @@ class NotStructuredConfig:
 if sys.version_info >= (3, 8):  # pragma: no cover
 
     class TypedDictSubclass(TypedDict):
-        foo: int
+        foo: str
 
 
-@attr.s(auto_attribs=True)
-class StructuredWithInvalidField:
+class StructuredWithInvalidField(Struct, frozen=False):
     bar: NotStructuredConfig = NotStructuredConfig()
 
 
-@attr.s(auto_attribs=True)
-class User:
+class User(Struct, frozen=False):
     name: str = MISSING
     age: int = MISSING
 
 
-@attr.s(auto_attribs=True)
-class UserList:
+class ExtensibleUser(Struct, InstanceDict, frozen=False):
+    name: str = MISSING
+    age: int = MISSING
+
+
+class UserList(Struct, frozen=False):
     list: List[User] = MISSING
 
 
-@attr.s(auto_attribs=True)
-class UserDict:
+class UserDict(Struct, frozen=False):
     dict: Dict[str, User] = MISSING
 
 
-@attr.s(auto_attribs=True)
-class UserWithDefaultName(User):
+class UserWithDefaultName(User, frozen=False):
     name: str = "bob"
 
 
-@attr.s(auto_attribs=True)
-class MissingUserField:
+class MissingUserField(Struct, frozen=False):
     user: User = MISSING
 
 
-@attr.s(auto_attribs=True)
-class MissingUserWithDefaultNameField:
+class MissingUserWithDefaultNameField(Struct, frozen=False):
     user: UserWithDefaultName = MISSING
 
 
-@attr.s(auto_attribs=True)
-class OptionalUser:
+class OptionalUser(Struct, frozen=False):
     user: Optional[User] = None
 
 
-@attr.s(auto_attribs=True)
-class InterpolationToUser:
+class InterpolationToUser(Struct, frozen=False):
     user: User = User("Bond", 7)
     admin: User = II("user")
     admin_list: List[User] = [II("user")]
     admin_dict: Dict[str, User] = {"bond": II("user")}
 
 
-@attr.s(auto_attribs=True)
-class AnyTypeConfig:
+class AnyTypeConfig(Struct, frozen=False):
     with_default: Any = "Can get any type at runtime"
     null_default: Any = None
     # Access to this prior to assigning a value to it will result in
@@ -103,8 +98,7 @@ class AnyTypeConfig:
     typed_int_default: int = 10
 
 
-@attr.s(auto_attribs=True)
-class BoolConfig:
+class BoolConfig(Struct, frozen=False):
     # with default value
     with_default: bool = True
 
@@ -118,8 +112,7 @@ class BoolConfig:
     interpolation: bool = II("with_default")
 
 
-@attr.s(auto_attribs=True)
-class IntegersConfig:
+class IntegersConfig(Struct, frozen=False):
     # with default value
     with_default: int = 10
 
@@ -133,8 +126,7 @@ class IntegersConfig:
     interpolation: int = II("with_default")
 
 
-@attr.s(auto_attribs=True)
-class StringConfig:
+class StringConfig(Struct, frozen=False):
     # with default value
     with_default: str = "foo"
 
@@ -148,8 +140,7 @@ class StringConfig:
     interpolation: str = II("with_default")
 
 
-@attr.s(auto_attribs=True)
-class FloatConfig:
+class FloatConfig(Struct, frozen=False):
     # with default value
     with_default: float = 0.10
 
@@ -163,8 +154,7 @@ class FloatConfig:
     interpolation: float = II("with_default")
 
 
-@attr.s(auto_attribs=True)
-class BytesConfig:
+class BytesConfig(Struct, frozen=False):
     # with default value
     with_default: bytes = b"binary"
 
@@ -178,8 +168,7 @@ class BytesConfig:
     interpolation: bytes = II("with_default")
 
 
-@attr.s(auto_attribs=True)
-class PathConfig:
+class PathConfig(Struct, frozen=False):
     # with default value
     with_default: Path = Path("hello.txt")
 
@@ -193,8 +182,7 @@ class PathConfig:
     interpolation: Path = II("with_default")
 
 
-@attr.s(auto_attribs=True)
-class EnumConfig:
+class EnumConfig(Struct, frozen=False):
     # with default value
     with_default: Color = Color.BLUE
 
@@ -208,8 +196,7 @@ class EnumConfig:
     interpolation: Color = II("with_default")
 
 
-@attr.s(auto_attribs=True)
-class LiteralConfig:
+class LiteralConfig(Struct, frozen=False):
     with_default: Literal["foo", "bar", True, b"baz", 5, Color.GREEN] = "foo"
     null_default: Optional[Literal["foo", "bar", True, b"baz", 5, Color.GREEN]] = None
     mandatory_missing: Literal["foo", "bar", True, b"baz", 5, Color.GREEN] = MISSING
@@ -218,34 +205,27 @@ class LiteralConfig:
     )
 
 
-@attr.s(auto_attribs=True)
-class LiteralContainers:
+class LiteralContainers(Struct, frozen=False):
     list_: List[Literal["foo", "bar"]] = cast(List[Literal["foo", "bar"]], ["foo"])
-    dict_: Dict[str, Literal["foo", "bar"]] = cast(
-        Dict[str, Literal["foo", "bar"]], {"key": "foo"}
-    )
+    dict_: Dict[str, Literal["foo", "bar"]] = cast(Dict[str, Literal["foo", "bar"]], {"key": "foo"})
 
 
-@attr.s(auto_attribs=True)
-class ConfigWithList:
+class ConfigWithList(Struct, frozen=False):
     list1: List[int] = [1, 2, 3]
     list2: Tuple[int, int, int] = (1, 2, 3)
     missing: List[int] = MISSING
 
 
-@attr.s(auto_attribs=True)
-class ConfigWithDict:
+class ConfigWithDict(Struct, frozen=False):
     dict1: Dict[str, Any] = {"foo": "bar"}
     missing: Dict[str, Any] = MISSING
 
 
-@attr.s(auto_attribs=True)
-class ConfigWithDict2:
+class ConfigWithDict2(Struct, frozen=False):
     dict1: Dict[str, int] = {"foo": 2}
 
 
-@attr.s(auto_attribs=True)
-class Nested:
+class Nested(Struct, frozen=False):
     # with default value
     with_default: int = 10
 
@@ -260,13 +240,11 @@ class Nested:
     interpolation: int = II("value_at_root")
 
 
-@attr.s(auto_attribs=True)
-class NestedSubclass(Nested):
+class NestedSubclass(Nested, frozen=False):
     additional: int = 20
 
 
-@attr.s(auto_attribs=True)
-class NestedConfig:
+class NestedConfig(Struct, frozen=False):
     default_value: Nested
 
     # with default value
@@ -275,18 +253,15 @@ class NestedConfig:
     value_at_root: int = 1000
 
 
-@attr.s(auto_attribs=True)
-class NestedWithAny:
+class NestedWithAny(Struct, InstanceDict, frozen=False):
     var: Any = Nested()
 
 
-@attr.s(auto_attribs=True)
-class NoDefaultValue:
+class NoDefaultValue(Struct, frozen=False):
     no_default: Any
 
 
-@attr.s(auto_attribs=True)
-class Interpolation:
+class Interpolation(Struct, frozen=False):
     x: int = 100
     y: int = 200
     # The real type of y is int, cast the interpolation string
@@ -295,124 +270,106 @@ class Interpolation:
     z2: str = SI("${x}_${y}")
 
 
-@attr.s(auto_attribs=True)
-class RelativeInterpolation:
+class RelativeInterpolation(Struct, frozen=False):
     x: int = 100
     y: int = 200
     z1: int = II(".x")
     z2: str = SI("${.x}_${.y}")
 
 
-@attr.s(auto_attribs=True)
-class BoolOptional:
+class BoolOptional(Struct, frozen=False):
     with_default: Optional[bool] = True
     as_none: Optional[bool] = None
     not_optional: bool = True
 
 
-@attr.s(auto_attribs=True)
-class IntegerOptional:
+class IntegerOptional(Struct, frozen=False):
     with_default: Optional[int] = 1
     as_none: Optional[int] = None
     not_optional: int = 1
 
 
-@attr.s(auto_attribs=True)
-class FloatOptional:
+class FloatOptional(Struct, frozen=False):
     with_default: Optional[float] = 1.0
     as_none: Optional[float] = None
     not_optional: float = 1
 
 
-@attr.s(auto_attribs=True)
-class StringOptional:
+class StringOptional(Struct, frozen=False):
     with_default: Optional[str] = "foo"
     as_none: Optional[str] = None
     not_optional: str = "foo"
 
 
-@attr.s(auto_attribs=True)
-class ListOptional:
+class ListOptional(Struct, frozen=False):
     with_default: Optional[List[int]] = [1, 2, 3]
     as_none: Optional[List[int]] = None
     not_optional: List[int] = [1, 2, 3]
 
 
-@attr.s(auto_attribs=True)
-class TupleOptional:
+class TupleOptional(Struct, frozen=False):
     with_default: Optional[Tuple[int, int, int]] = (1, 2, 3)
     as_none: Optional[Tuple[int, int, int]] = None
     not_optional: Tuple[int, int, int] = (1, 2, 3)
 
 
-@attr.s(auto_attribs=True)
-class EnumOptional:
+class EnumOptional(Struct, frozen=False):
     with_default: Optional[Color] = Color.BLUE
     as_none: Optional[Color] = None
     not_optional: Color = Color.BLUE
 
 
-@attr.s(auto_attribs=True)
-class DictOptional:
+class DictOptional(Struct, frozen=False):
     with_default: Optional[Dict[str, int]] = {"a": 10}
     as_none: Optional[Dict[str, int]] = None
     not_optional: Dict[str, int] = {"a": 10}
 
 
-@attr.s(auto_attribs=True)
-class NoneTypeAnnotations:
+class NoneTypeAnnotations(Struct, frozen=False):
     none: None = None
     none_type: type(None) = None  # type: ignore[valid-type]
     list_none: list[None] = [None]
-    list_none_type: list[type(None)] = [None]  # type: ignore[valid-type]
+    list_none_type: list[type(None)] = [None]
     dict_none: dict[str, None] = {"key": None}
     tuple_none: tuple[None] = (None,)
 
 
-@attr.s(auto_attribs=True)
-class RecursiveDict:
+class RecursiveDict(Struct, frozen=False):
     d: Dict[str, "RecursiveDict"] = MISSING
 
 
-@attr.s(auto_attribs=True)
-class StructuredOptional:
+class StructuredOptional(Struct, frozen=False):
     with_default: Optional[Nested] = Nested()
     as_none: Optional[Nested] = None
     not_optional: Nested = Nested()
 
 
-@attr.s(auto_attribs=True, frozen=True)
-class FrozenClass:
+class FrozenClass(Struct):
     user: User = User(name="Bart", age=10)
     x: int = 10
     list: List[int] = [1, 2, 3]
 
 
-@attr.s(auto_attribs=True)
-class ContainsFrozen:
+class ContainsFrozen(Struct, frozen=False):
     x: int = 10
     frozen: FrozenClass = FrozenClass()
 
 
-@attr.s(auto_attribs=True)
-class WithListField:
+class WithListField(Struct, frozen=False):
     list: List[int] = [1, 2, 3]
 
 
-@attr.s(auto_attribs=True)
-class WithDictField:
+class WithDictField(Struct, frozen=False):
     dict: Dict[str, int] = {"foo": 10, "bar": 20}
 
 
 if sys.version_info >= (3, 8):  # pragma: no cover
 
-    @attr.s(auto_attribs=True)
-    class WithTypedDictField:
+    class WithTypedDictField(Struct, frozen=False):
         dict: TypedDictSubclass
 
 
-@attr.s(auto_attribs=True)
-class ErrorDictObjectKey:
+class ErrorDictObjectKey(Struct, frozen=False):
     # invalid dict key, must be str
     dict: Dict[object, str] = {object(): "foo", object(): "bar"}
 
@@ -421,30 +378,30 @@ class RegularClass:
     pass
 
 
-@attr.s(auto_attribs=True)
-class ErrorDictUnsupportedValue:
+class ErrorDictUnsupportedValue(Struct, frozen=False):
     # invalid dict value type, not one of the supported types
     dict: Dict[str, RegularClass] = {}
 
 
-@attr.s(auto_attribs=True)
-class ErrorListUnsupportedValue:
+class ErrorListUnsupportedValue(Struct, frozen=False):
     # invalid dict value type, not one of the supported types
     dict: List[RegularClass] = []
 
 
-@attr.s(auto_attribs=True)
-class InvalidNestedValue:
+class ErrorListUnsupportedStructuredConfig(Struct, frozen=False):
+    # Nesting of structured configs in Dict and List is not currently supported
+    list: List[User] = []
+
+
+class InvalidNestedValue(Struct, frozen=False):
     value: int = "not-an-int"  # type: ignore[assignment]
 
 
-@attr.s(auto_attribs=True)
-class StructuredWithInvalidNestedValue:
-    inner: InvalidNestedValue = attr.Factory(InvalidNestedValue)
+class StructuredWithInvalidNestedValue(Struct, frozen=False):
+    inner: InvalidNestedValue = InvalidNestedValue()
 
 
-@attr.s(auto_attribs=True)
-class ListExamples:
+class ListExamples(Struct, frozen=False):
     any: List[Any] = [1, "foo"]
     ints: List[int] = [1, 2]
     strings: List[str] = ["foo", "bar"]
@@ -452,8 +409,7 @@ class ListExamples:
     colors: List[Color] = [Color.RED, Color.GREEN]
 
 
-@attr.s(auto_attribs=True)
-class TupleExamples:
+class TupleExamples(Struct, frozen=False):
     any: Tuple[Any, Any] = (1, "foo")
     ints: Tuple[int, int] = (1, 2)
     strings: Tuple[str, str] = ("foo", "bar")
@@ -461,305 +417,250 @@ class TupleExamples:
     colors: Tuple[Color, Color] = (Color.RED, Color.GREEN)
 
 
-@attr.s(auto_attribs=True)
-class DictExamples:
+class DictExamples(Struct, frozen=False):
     any: Dict[str, Any] = {"a": 1, "b": "foo"}
     ints: Dict[str, int] = {"a": 10, "b": 20}
     strings: Dict[str, str] = {"a": "foo", "b": "bar"}
     booleans: Dict[str, bool] = {"a": True, "b": False}
     colors: Dict[str, Color] = {
-        "red": Color.RED,
-        "green": Color.GREEN,
-        "blue": Color.BLUE,
-    }
+            "red": Color.RED,
+            "green": Color.GREEN,
+            "blue": Color.BLUE,
+        }
     int_keys: Dict[int, str] = {1: "one", 2: "two"}
     float_keys: Dict[float, str] = {1.1: "one", 2.2: "two"}
     bool_keys: Dict[bool, str] = {True: "T", False: "F"}
     enum_key: Dict[Color, str] = {Color.RED: "red", Color.GREEN: "green"}
 
 
-@attr.s(auto_attribs=True)
-class DictOfObjects:
+class DictOfObjects(Struct, frozen=False):
     users: Dict[str, User] = {"joe": User(name="Joe", age=18)}
 
 
-@attr.s(auto_attribs=True)
-class DictOfObjectsMissing:
+class DictOfObjectsMissing(Struct, frozen=False):
     users: Dict[str, User] = {"moe": MISSING}
 
 
-@attr.s(auto_attribs=True)
-class ListOfObjects:
+class ListOfObjects(Struct, frozen=False):
     users: List[User] = [User(name="Joe", age=18)]
 
 
-@attr.s(auto_attribs=True)
-class ListOfObjectsMissing:
+class ListOfObjectsMissing(Struct, frozen=False):
     users: List[User] = [MISSING]
 
 
 class DictSubclass:
-    @attr.s(auto_attribs=True)
-    class Str2Str(Dict[str, str]):
+    class Str2Str(Struct, Dict[str, str], frozen=False):
         pass
 
-    @attr.s(auto_attribs=True)
-    class Str2Int(Dict[str, int]):
+    class Str2Int(Struct, Dict[str, int], frozen=False):
         pass
 
-    @attr.s(auto_attribs=True)
-    class Int2Str(Dict[int, str]):
+    class Int2Str(Struct, Dict[int, str], frozen=False):
         pass
 
-    @attr.s(auto_attribs=True)
-    class Float2Str(Dict[float, str]):
+    class Float2Str(Struct, Dict[float, str], frozen=False):
         pass
 
-    @attr.s(auto_attribs=True)
-    class Bool2Str(Dict[bool, str]):
+    class Bool2Str(Struct, Dict[bool, str], frozen=False):
         pass
 
-    @attr.s(auto_attribs=True)
-    class Color2Str(Dict[Color, str]):
+    class Color2Str(Struct, Dict[Color, str], frozen=False):
         pass
 
-    @attr.s(auto_attribs=True)
-    class Color2Color(Dict[Color, Color]):
+    class Color2Color(Struct, Dict[Color, Color], frozen=False):
         pass
 
-    @attr.s(auto_attribs=True)
-    class Str2User(Dict[str, User]):
+    class Str2User(Struct, InstanceDict, Dict[str, User], frozen=False):
         pass
 
-    @attr.s(auto_attribs=True)
-    class Str2StrWithField(Dict[str, str]):
+    class Str2StrWithField(Struct, InstanceDict, Dict[str, str], frozen=False):
         foo: str = "bar"
 
-    @attr.s(auto_attribs=True)
-    class Str2IntWithStrField(Dict[str, int]):
+    class Str2IntWithStrField(Struct, Dict[str, int], frozen=False):
         foo: int = 1
 
-    @attr.s(auto_attribs=True)
-    class Str2UserWithField(Dict[str, User]):
+    class Str2UserWithField(Struct, InstanceDict, Dict[str, User], frozen=False):
         foo: User = User("Bond", 7)
 
     class Error:
-        @attr.s(auto_attribs=True)
-        class User2Str(Dict[User, str]):
+        class User2Str(Struct, Dict[User, str], frozen=False):
             pass
 
 
-@attr.s(auto_attribs=True)
-class Plugin:
+class Plugin(Struct, frozen=False):
     name: str = MISSING
     params: Any = MISSING
 
 
-@attr.s(auto_attribs=True)
-class ConcretePlugin(Plugin):
+class ConcretePlugin(Plugin, frozen=False):
     name: str = "foobar_plugin"
 
-    @attr.s(auto_attribs=True)
-    class FoobarParams:
+    class FoobarParams(Struct, frozen=False):
         foo: int = 10
 
     params: FoobarParams = FoobarParams()
 
 
-@attr.s(auto_attribs=True)
-class PluginWithAdditionalField(Plugin):
+class PluginWithAdditionalField(Plugin, frozen=False):
     name: str = "foobar2_plugin"
     additional: int = 10
 
 
 # Does not extend Plugin, cannot be assigned or merged
-@attr.s(auto_attribs=True)
-class FaultyPlugin:
+class FaultyPlugin(Struct, frozen=False):
     name: str = "faulty_plugin"
 
 
-@attr.s(auto_attribs=True)
-class PluginHolder:
+class PluginHolder(Struct, frozen=False):
     none: Optional[Plugin] = None
     missing: Plugin = MISSING
     plugin: Plugin = Plugin()
     plugin2: Plugin = ConcretePlugin()
 
 
-@attr.s(auto_attribs=True)
-class LinkedList:
+class LinkedList(Struct, frozen=False):
     next: Optional["LinkedList"] = None
     value: Any = MISSING
 
 
-@attr.s(auto_attribs=True)
-class RecursiveList:
+class RecursiveList(Struct, frozen=False):
     d: List["RecursiveList"] = MISSING
 
 
 class MissingTest:
-    @attr.s(auto_attribs=True)
-    class Missing1:
+    class Missing1(Struct, frozen=False):
         head: LinkedList = MISSING
 
-    @attr.s(auto_attribs=True)
-    class Missing2:
+    class Missing2(Struct, frozen=False):
         head: LinkedList = LinkedList(next=MISSING, value=1)
 
 
-@attr.s(auto_attribs=True)
-class NestedWithNone:
+class NestedWithNone(Struct, frozen=False):
     plugin: Optional[Plugin] = None
 
 
-@attr.s(auto_attribs=True)
-class StructuredUnion:
+class StructuredUnion(Struct, frozen=False):
     x: Union[int, Plugin] = 10
 
 
-@attr.s(auto_attribs=True)
-class ContainerUnion:
-    x: Union[List[int], Dict[str, int]] = [1, 2]  # type: ignore
+class ContainerUnion(Struct, frozen=False):
+    x: Union[List[int], Dict[str, int]] = [1, 2]
 
 
-@attr.s(auto_attribs=True)
-class WithNativeMISSING:
-    num: int = attr.NOTHING  # type: ignore
+class WithNativeMISSING(Struct, frozen=False):
+    num: int
 
 
-@attr.s(auto_attribs=True)
-class MissingStructuredConfigField:
+class MissingStructuredConfigField(Struct, frozen=False):
     plugin: Plugin = MISSING
 
 
-@attr.s(auto_attribs=True)
-class ListClass:
+class ListClass(Struct, frozen=False):
     list: List[int] = []
     tuple: Tuple[int, int] = (1, 2)
 
 
-@attr.s(auto_attribs=True)
-class UntypedList:
+class UntypedList(Struct, frozen=False):
     list: List = [1, 2]  # type: ignore
     opt_list: Optional[List] = None  # type: ignore
 
 
-@attr.s(auto_attribs=True)
-class UntypedDict:
+class UntypedDict(Struct, frozen=False):
     dict: Dict = {"foo": "var"}  # type: ignore
     opt_dict: Optional[Dict] = None  # type: ignore
 
 
 class StructuredSubclass:
-    @attr.s(auto_attribs=True)
-    class ParentInts:
+    class ParentInts(Struct, frozen=False):
         int1: int
         int2: int
-        int3: int = attr.NOTHING  # type: ignore
+        int3: int
         int4: int = MISSING
 
-    @attr.s(auto_attribs=True)
-    class ChildInts(ParentInts):
+    class ChildInts(ParentInts, frozen=False):
         int2: int = 5
         int3: int = 10
         int4: int = 15
 
-    @attr.s(auto_attribs=True)
-    class ParentContainers:
+    class ParentContainers(Struct, frozen=False):
         list1: List[int] = MISSING
         list2: List[int] = [5, 6]
         dict: Dict[str, Any] = MISSING
 
-    @attr.s(auto_attribs=True)
-    class ChildContainers(ParentContainers):
+    class ChildContainers(ParentContainers, frozen=False):
         list1: List[int] = [1, 2, 3]
         dict: Dict[str, Any] = {"a": 5, "b": 6}
 
-    @attr.s(auto_attribs=True)
-    class ParentNoDefaultFactory:
+    class ParentNoDefaultFactory(Struct, frozen=False):
         no_default_to_list: Any
         int_to_list: Any = 1
 
-    @attr.s(auto_attribs=True)
-    class ChildWithDefaultFactory(ParentNoDefaultFactory):
+    class ChildWithDefaultFactory(ParentNoDefaultFactory, frozen=False):
         no_default_to_list: Any = ["hi"]
         int_to_list: Any = ["hi"]
 
 
-@attr.s(auto_attribs=True)
-class HasInitFalseFields:
-    post_initialized: str = attr.field(init=False)
-    without_default: str = attr.field(init=False)
-    with_default: str = attr.field(init=False, default="default")
-
-    def __attrs_post_init__(self) -> None:
-        self.post_initialized = "set_by_post_init"
-
-
-@attr.s(auto_attribs=True)
-class LeadingUnderscoreFields:
+class LeadingUnderscoreFields(Struct, frozen=False):
     _foo: str = "x"
     _bar: str = "y"
 
 
 class NestedContainers:
-    @attr.s(auto_attribs=True)
-    class ListOfLists:
+    class ListOfLists(Struct, frozen=False):
         lls: List[List[str]]
         llx: List[List[User]]
         llla: List[List[List[Any]]]
         lloli: List[List[Optional[List[int]]]]
-        lls_default: List[List[str]] = [[], ["abc", "def", 123, MISSING], MISSING]  # type: ignore
+        lls_default: List[List[str]] = cast(
+                List[List[str]], [[], ["abc", "def", 123, MISSING], MISSING]
+            )
         lolx_default: List[Optional[List[User]]] = [
-            [],
-            [User(), User(age=7, name="Bond"), MISSING],
-            MISSING,
-        ]
+                [],
+                [User(), User(age=7, name="Bond"), MISSING],
+                MISSING,
+            ]
 
-    @attr.s(auto_attribs=True)
-    class DictOfDicts:
+    class DictOfDicts(Struct, frozen=False):
         dsdsi: Dict[str, Dict[str, int]]
         dsdbi: Dict[str, Dict[bool, int]]
         dsdsx: Dict[str, Dict[str, User]]
         odsdsi_default: Optional[Dict[str, Dict[str, int]]] = cast(
-            Optional[Dict[str, Dict[str, int]]],
-            {
-                "dsi1": {},
-                "dsi2": {"s1": 1, "s2": "123", "s3": MISSING},
-                "dsi3": MISSING,
-            },
-        )
+                Optional[Dict[str, Dict[str, int]]],
+                {
+                    "dsi1": {},
+                    "dsi2": {"s1": 1, "s2": "123", "s3": MISSING},
+                    "dsi3": MISSING,
+                },
+            )
         dsdsx_default: Dict[str, Dict[str, User]] = {
-            "dsx1": {},
-            "dsx2": {
-                "s1": User(),
-                "s2": User(age=7, name="Bond"),
-                "s3": MISSING,
-            },
-            "dsx3": MISSING,
-        }
+                "dsx1": {},
+                "dsx2": {
+                    "s1": User(),
+                    "s2": User(age=7, name="Bond"),
+                    "s3": MISSING,
+                },
+                "dsx3": MISSING,
+            }
 
-    @attr.s(auto_attribs=True)
-    class ListsAndDicts:
+    class ListsAndDicts(Struct, frozen=False):
         lldsi: List[List[Dict[str, int]]]
         ldaos: List[Dict[Any, Optional[str]]]
         dedsle: Dict[Color, Dict[str, List[Enum1]]]
         dsolx: Dict[str, Optional[List[User]]]
         oldfox: Optional[List[Dict[float, Optional[User]]]]
         dedsle_default: Dict[Color, Dict[str, List[Enum1]]] = {
-            Color.RED: {"a": [Enum1.FOO, Enum1.BAR]},
-            Color.GREEN: {"b": []},
-            Color.BLUE: {},
-        }
+                Color.RED: {"a": [Enum1.FOO, Enum1.BAR]},
+                Color.GREEN: {"b": []},
+                Color.BLUE: {},
+            }
 
-    @attr.s(auto_attribs=True)
-    class WithDefault:
+    class WithDefault(Struct, frozen=False):
         dsolx_default: Dict[str, Optional[List[User]]] = {"lx": [User()], "n": None}
 
 
 class UnionsOfPrimitveTypes:
-    @attr.s(auto_attribs=True)
-    class Simple:
+    class Simple(Struct, frozen=False):
         uis: Union[int, str]
         ubc: Union[bool, Color]
         uxf: Union[bytes, float]
@@ -768,8 +669,7 @@ class UnionsOfPrimitveTypes:
         uisn: Union[int, str, None]
         uisN: Union[int, str, type(None)]  # type: ignore
 
-    @attr.s(auto_attribs=True)
-    class WithDefaults:
+    class WithDefaults(Struct, frozen=False):
         uis: Union[int, str] = "abc"
         ubc1: Union[bool, Color] = True
         ubc2: Union[bool, Color] = Color.RED
@@ -778,36 +678,29 @@ class UnionsOfPrimitveTypes:
         uisn: Union[int, str, None] = 123
         uisN: Union[int, str, type(None)] = "abc"  # type: ignore
 
-    @attr.s(auto_attribs=True)
-    class WithExplicitMissing:
+    class WithExplicitMissing(Struct, frozen=False):
         uis_missing: Union[int, str] = MISSING
 
-    @attr.s(auto_attribs=True)
-    class WithBadDefaults1:
+    class WithBadDefaults1(Struct, frozen=False):
         uis: Union[int, str] = None  # type: ignore
 
-    @attr.s(auto_attribs=True)
-    class WithBadDefaults2:
+    class WithBadDefaults2(Struct, frozen=False):
         ubc: Union[bool, Color] = "abc"  # type: ignore
 
-    @attr.s(auto_attribs=True)
-    class WithBadDefaults3:
+    class WithBadDefaults3(Struct, frozen=False):
         uxf: Union[bytes, float] = True
 
-    @attr.s(auto_attribs=True)
-    class WithBadDefaults4:
+    class WithBadDefaults4(Struct, frozen=False):
         oufb: Optional[Union[float, bool]] = Color.RED  # type: ignore
 
-    @attr.s(auto_attribs=True)
-    class ContainersOfUnions:
+    class ContainersOfUnions(Struct, frozen=False):
         lubc: List[Union[bool, Color]]
         dsubf: Dict[str, Union[bool, float]]
         dsoubf: Dict[str, Optional[Union[bool, float]]]
         lubc_with_default: List[Union[bool, Color]] = [True, Color.RED]
         dsubf_with_default: Dict[str, Union[bool, float]] = {"abc": True, "xyz": 1.2}
 
-    @attr.s(auto_attribs=True)
-    class InterpolationFromUnion:
+    class InterpolationFromUnion(Struct, frozen=False):
         ubi: Union[bool, int]
         oubi: Optional[Union[bool, int]]
         an_int: int = 123
@@ -817,21 +710,18 @@ class UnionsOfPrimitveTypes:
         ubi_with_default: Union[bool, int] = II("an_int")
         oubi_with_default: Optional[Union[bool, int]] = II("none")
 
-    @attr.s(auto_attribs=True)
-    class InterpolationToUnion:
+    class InterpolationToUnion(Struct, frozen=False):
         a_float: float = II("ufs")
         bad_int_interp: bool = II("ufs")
         ufs: Union[float, str] = 10.1
 
-    @attr.s(auto_attribs=True)
-    class BadInterpolationFromUnion:
+    class BadInterpolationFromUnion(Struct, frozen=False):
         a_float: float = 10.1
         ubi: Union[bool, int] = II("a_float")
 
     if sys.version_info >= (3, 10):
 
-        @attr.s(auto_attribs=True)
-        class SupportPEP604:
+        class SupportPEP604(Struct, frozen=False):
             """https://peps.python.org/pep-0604/"""
 
             uis: int | str
@@ -842,8 +732,7 @@ class UnionsOfPrimitveTypes:
 
 if sys.version_info >= (3, 9):
 
-    @attr.s(auto_attribs=True)
-    class SupportPEP585:
+    class SupportPEP585(Struct, frozen=False):
         """
         PEP 585 – Type Hinting Generics In Standard Collections
         https://peps.python.org/pep-0585/
@@ -860,37 +749,20 @@ if sys.version_info >= (3, 9):
         tuple_no_subscript: tuple = (123,)  # type: ignore[type-arg]
 
 
-@attr.s(auto_attribs=True)
-class HasForwardRef:
-    @attr.s(auto_attribs=True)
-    class CA:
+class HasForwardRef(Struct, frozen=False):
+    class CA(Struct, frozen=False):
         x: int = 3
 
-    @attr.s(auto_attribs=True)
-    class CB:
+    class CB(Struct, frozen=False):
         sub: "HasForwardRef.CA"
 
     a: CA
     b: CB
 
 
-@attr.s(auto_attribs=True)
-class HasBadAnnotation1:
+class HasBadAnnotation1(Struct, frozen=False):
     data: object
 
 
-@attr.s(auto_attribs=True)
-class HasBadAnnotation2:
+class HasBadAnnotation2(Struct, frozen=False):
     data: object()  # type: ignore
-
-
-@attr.s(auto_attribs=True)
-class HasIgnoreMetadataRequired:
-    ignore: int = attr.field(metadata={"omegaconf_ignore": True})
-    no_ignore: int = attr.field(metadata={"omegaconf_ignore": False})
-
-
-@attr.s(auto_attribs=True)
-class HasIgnoreMetadataWithDefault:
-    ignore: int = attr.field(default=1, metadata={"omegaconf_ignore": True})
-    no_ignore: int = attr.field(default=2, metadata={"omegaconf_ignore": False})

@@ -1,35 +1,22 @@
-from dataclasses import dataclass, field
 from types import GenericAlias
-from typing import Any, List, NamedTuple, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
-import attr
 from pytest import mark, param, raises
+from salix import Struct
 from typing_extensions import TypeVarTuple, Unpack
 
 from omegaconf import MISSING, ListConfig, OmegaConf, TupleConfig, ValidationError
+from tests import Shape
 
 
-@dataclass
-class TupleFields:
+class TupleFields(Struct, frozen=False):
     fixed: Tuple[int, str] = (1, "x")
     variadic: Tuple[int, ...] = (1, 2)
     empty: Tuple[()] = ()
     bare: tuple = ()
     optional: Optional[Tuple[int, ...]] = None
     missing: Tuple[int, str] = MISSING
-    numbers: List[int] = field(default_factory=list)
-
-
-@attr.s(auto_attribs=True)
-class AttrTupleFields:
-    fixed: Tuple[int, str] = (1, "x")
-    variadic: tuple[int, ...] = (1, 2)
-    optional: Optional[Tuple[int, ...]] = None
-
-
-class Point(NamedTuple):
-    x: int
-    y: int
+    numbers: List[int] = []
 
 
 def test_create_native_tuple_returns_tupleconfig() -> None:
@@ -46,8 +33,8 @@ def test_create_native_list_still_returns_listconfig() -> None:
     assert OmegaConf.get_type(cfg) is list
 
 
-def test_namedtuple_keeps_existing_non_tupleconfig_behavior() -> None:
-    cfg = OmegaConf.create(Point(1, 2))
+def test_tuple_subclass_keeps_existing_non_tupleconfig_behavior() -> None:
+    cfg = OmegaConf.create(Shape((1, 2, 3)))
 
     assert isinstance(cfg, ListConfig)
     assert not isinstance(cfg, TupleConfig)
@@ -121,7 +108,7 @@ def test_typed_tuple_rejects_misplaced_ellipsis() -> None:
         OmegaConf.typed_tuple([], tuple_type=tuple_type)
 
 
-def test_dataclass_tuple_fields() -> None:
+def test_struct_tuple_fields() -> None:
     cfg = OmegaConf.structured(TupleFields)
     assert isinstance(cfg.fixed, TupleConfig)
     assert isinstance(cfg.variadic, TupleConfig)
@@ -130,15 +117,6 @@ def test_dataclass_tuple_fields() -> None:
     assert cfg.fixed == (1, "x")
     assert cfg.variadic == (1, 2)
     assert cfg.empty == ()
-    assert cfg.optional is None
-
-
-def test_attrs_tuple_fields() -> None:
-    cfg = OmegaConf.structured(AttrTupleFields)
-    assert isinstance(cfg.fixed, TupleConfig)
-    assert isinstance(cfg.variadic, TupleConfig)
-    assert cfg.fixed == (1, "x")
-    assert cfg.variadic == (1, 2)
     assert cfg.optional is None
 
 
