@@ -48,11 +48,6 @@ except ImportError:  # pragma: no cover
     BaseDumper = yaml.Dumper
 
 if TYPE_CHECKING:
-    import dataclasses
-
-    import attr
-    from attr import Attribute as AttrAttribute
-
     from .basecontainer import BaseContainer
 
 
@@ -530,124 +525,6 @@ def extract_dict_subclass_data(obj: Any, parent: Any) -> Optional[Dict[str, Any]
         return None
 
 
-def get_attr_class_fields(obj: Any) -> List["AttrAttribute[Any]"]:
-    import attr
-
-    is_type = isinstance(obj, type)
-    obj_type = obj if is_type else type(obj)
-    fields = attr.fields_dict(obj_type).values()
-    return [f for f in fields if f.metadata.get("omegaconf_ignore") is not True]
-
-
-def get_attr_data(
-    obj: Any,
-    allow_objects: Optional[bool] = None,
-    parent: Optional["BaseContainer"] = None,
-) -> Dict[str, Any]:
-    import attr
-
-    from omegaconf.base import Node
-    from omegaconf.omegaconf import OmegaConf, _maybe_wrap
-
-    flags = {"allow_objects": allow_objects} if allow_objects is not None else {}
-
-    from omegaconf import MISSING
-
-    d = {}
-    is_type = isinstance(obj, type)
-    obj_type = obj if is_type else type(obj)
-    dummy_parent = OmegaConf.create({}, flags=flags)
-    dummy_parent._metadata.object_type = obj_type
-    if parent is not None:
-        dummy_parent._set_key(parent._key())
-        dummy_parent._set_parent(parent._get_parent())
-    resolved_hints = get_type_hints(obj_type)
-
-    for attrib in get_attr_class_fields(obj):
-        assert attr is not None  # help type-checkers
-        name = attrib.name
-        is_optional, type_ = _resolve_optional(resolved_hints[name])
-        type_ = _resolve_forward(type_, obj.__module__)
-        if not is_type:
-            value = getattr(obj, name)
-        else:
-            default = attrib.default
-            if default == attr.NOTHING:
-                value = MISSING
-            elif isinstance(default, attr.Factory):  # type: ignore[arg-type]
-                assert default is not None
-                if default.takes_self:
-                    e = ConfigValueError(
-                        "'takes_self' in attrs attributes is not supported\n"
-                        + f"{name}: {type_str(type_)}"
-                    )
-                    format_and_raise(
-                        node=None, key=None, value=default, cause=e, msg=str(e)
-                    )
-                value = default.factory()
-            else:
-                value = default
-        if isinstance(value, Node):
-            value = copy.deepcopy(value)
-        if is_union_annotation(type_) and not is_supported_union_annotation(type_):
-            e = ConfigValueError(
-                f"Unsupported type annotation in Union:\n{name}: {type_str(type_)}"  # noqa: E231
-            )
-            format_and_raise(node=None, key=None, value=value, cause=e, msg=str(e))
-
-        try:
-            d[name] = _maybe_wrap(
-                ref_type=type_,
-                is_optional=is_optional,
-                key=name,
-                value=value,
-                parent=dummy_parent,
-            )
-        except (ValidationError, GrammarParseError) as ex:
-            format_and_raise(
-                node=dummy_parent, key=name, value=value, cause=ex, msg=str(ex)
-            )
-        d[name]._set_parent(None)
-    dict_subclass_data = extract_dict_subclass_data(obj=obj, parent=dummy_parent)
-    if dict_subclass_data is not None:
-        d.update(dict_subclass_data)
-    return d
-
-
-def get_dataclass_fields(obj: Any) -> List["dataclasses.Field[Any]"]:
-    import dataclasses
-
-    fields = dataclasses.fields(obj)
-    return [f for f in fields if f.metadata.get("omegaconf_ignore") is not True]
-
-
-def get_dataclass_data(
-    obj: Any,
-    allow_objects: Optional[bool] = None,
-    parent: Optional["BaseContainer"] = None,
-) -> Dict[str, Any]:
-    import dataclasses
-
-    from omegaconf.omegaconf import MISSING
-
-    def class_value(field: "dataclasses.Field[Any]") -> Any:
-        if field.default != dataclasses.MISSING:
-            return field.default
-        if field.default_factory != dataclasses.MISSING:
-            return field.default_factory()  # type: ignore
-        return MISSING
-
-    return _get_fields_data(
-        obj=obj,
-        allow_objects=allow_objects,
-        parent=parent,
-        fields=[
-            (field.name, field.type, partial(class_value, field))
-            for field in get_dataclass_fields(obj)
-        ],
-    )
-
-
 def get_struct_data(
     obj: Any,
     allow_objects: Optional[bool] = None,
@@ -720,28 +597,6 @@ def _get_fields_data(
     return d
 
 
-def is_dataclass(obj: Any) -> bool:
-    from omegaconf.base import Node
-
-    if isinstance(obj, Node):
-        return False
-    dataclasses = sys.modules.get("dataclasses")
-    if dataclasses is None:
-        return False
-    is_dataclass = dataclasses.is_dataclass(obj)
-    assert isinstance(is_dataclass, bool)
-    return is_dataclass
-
-
-def is_attr_class(obj: Any) -> bool:
-    from omegaconf.base import Node
-
-    attr = sys.modules.get("attr")
-    if attr is None or isinstance(obj, Node):
-        return False
-    return bool(attr.has(obj))
-
-
 def is_struct(obj: Any) -> bool:
     from omegaconf.base import Node
 
@@ -751,20 +606,7 @@ def is_struct(obj: Any) -> bool:
 
 
 def is_structured_config(obj: Any) -> bool:
-    return is_attr_class(obj) or is_dataclass(obj) or is_struct(obj)
-
-
-def is_dataclass_frozen(type_: Any) -> bool:
-    return type_.__dataclass_params__.frozen  # type: ignore
-
-
-def is_attr_frozen(type_: type) -> bool:
-    import attr
-
-    # This is very hacky and probably fragile as well.
-    # Unfortunately currently there isn't an official API in attr that can detect that.
-    # noinspection PyProtectedMember
-    return type_.__setattr__ == attr._make._frozen_setattrs  # type: ignore
+    return is_struct(obj)
 
 
 class _FrozenStructProbe(Struct, frozen=True):
@@ -786,39 +628,14 @@ def get_type_of(class_or_object: Any) -> Type[Any]:
 def is_structured_config_frozen(obj: Any) -> bool:
     type_ = get_type_of(obj)
 
-    if is_dataclass(type_):
-        return is_dataclass_frozen(type_)
-    if is_attr_class(type_):
-        return is_attr_frozen(type_)
-    if is_struct(type_):
-        return is_struct_frozen(type_)
-    return False
-
-
-def _find_attrs_init_field_alias(field: Any) -> str:
-    # New versions of attrs, after 22.2.0, have the alias explicitly defined.
-    # Previous versions implicitly strip the underscore in the init parameter.
-    if hasattr(field, "alias"):
-        assert isinstance(field.alias, str)
-        return field.alias
-    else:  # pragma: no cover
-        assert isinstance(field.name, str)
-        return field.name.lstrip("_")
+    return is_struct(type_) and is_struct_frozen(type_)
 
 
 def get_structured_config_init_field_aliases(obj: Any) -> Dict[str, str]:
-    fields: Union[List["dataclasses.Field[Any]"], List["AttrAttribute[Any]"]]
-    if is_dataclass(obj):
-        fields = get_dataclass_fields(obj)
-        return {f.name: f.name for f in fields if f.init}
-    elif is_attr_class(obj):
-        fields = get_attr_class_fields(obj)
-        return {f.name: _find_attrs_init_field_alias(f) for f in fields if f.init}
-    elif is_struct(obj):
+    if is_struct(obj):
         cls = get_type_of(obj)
         return {name: name for name in cls.__struct_fields__}  # type: ignore
-    else:
-        raise ValueError(f"Unsupported type: {type(obj).__name__}")
+    raise ValueError(f"Unsupported type: {type(obj).__name__}")
 
 
 def get_structured_config_data(
@@ -826,11 +643,7 @@ def get_structured_config_data(
     allow_objects: Optional[bool] = None,
     parent: Optional["BaseContainer"] = None,
 ) -> Dict[str, Any]:
-    if is_dataclass(obj):
-        return get_dataclass_data(obj, allow_objects=allow_objects, parent=parent)
-    elif is_attr_class(obj):
-        return get_attr_data(obj, allow_objects=allow_objects, parent=parent)
-    elif is_struct(obj):
+    if is_struct(obj):
         return get_struct_data(obj, allow_objects=allow_objects, parent=parent)
     else:
         raise ValueError(f"Unsupported type: {type(obj).__name__}")
