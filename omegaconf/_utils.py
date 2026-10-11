@@ -8,10 +8,12 @@ import sys
 import types
 import warnings
 from enum import Enum
+from functools import partial
 from textwrap import dedent
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Dict,
     FrozenSet,
     List,
@@ -24,6 +26,9 @@ from typing import (
 )
 
 import yaml
+from salix import MISSING as SALIX_MISSING
+from salix import Field as SalixField
+from salix import fields as salix_fields
 
 from .errors import (
     ConfigIndexError,
@@ -620,60 +625,24 @@ def get_dataclass_data(
     allow_objects: Optional[bool] = None,
     parent: Optional["BaseContainer"] = None,
 ) -> Dict[str, Any]:
-    from omegaconf.base import Node
-    from omegaconf.omegaconf import MISSING, OmegaConf, _maybe_wrap
+    from omegaconf.omegaconf import MISSING
 
-    flags = {"allow_objects": allow_objects} if allow_objects is not None else {}
-    d = {}
-    is_type = isinstance(obj, type)
-    obj_type = get_type_of(obj)
-    dummy_parent = OmegaConf.create({}, flags=flags)
-    dummy_parent._metadata.object_type = obj_type
-    if parent is not None:
-        dummy_parent._set_key(parent._key())
-        dummy_parent._set_parent(parent._get_parent())
-    resolved_hints = get_type_hints(obj_type)
-    for field in get_dataclass_fields(obj):
-        name = field.name
-        is_optional, type_ = _resolve_optional(resolved_hints[field.name])
-        type_ = _resolve_forward(type_, obj.__module__)
-        has_default = field.default != dataclasses.MISSING
-        has_default_factory = field.default_factory != dataclasses.MISSING
+    def class_value(field: "dataclasses.Field[Any]") -> Any:
+        if field.default != dataclasses.MISSING:
+            return field.default
+        if field.default_factory != dataclasses.MISSING:
+            return field.default_factory()  # type: ignore
+        return MISSING
 
-        if not is_type:
-            value = getattr(obj, name)
-        else:
-            if has_default:
-                value = field.default
-            elif has_default_factory:
-                value = field.default_factory()  # type: ignore
-            else:
-                value = MISSING
-        if isinstance(value, Node):
-            value = copy.deepcopy(value)
-
-        if is_union_annotation(type_) and not is_supported_union_annotation(type_):
-            e = ConfigValueError(
-                f"Unsupported type annotation in Union:\n{name}: {type_str(type_)}"  # noqa: E231
-            )
-            format_and_raise(node=None, key=None, value=value, cause=e, msg=str(e))
-        try:
-            d[name] = _maybe_wrap(
-                ref_type=type_,
-                is_optional=is_optional,
-                key=name,
-                value=value,
-                parent=dummy_parent,
-            )
-        except (ValidationError, GrammarParseError) as ex:
-            format_and_raise(
-                node=dummy_parent, key=name, value=value, cause=ex, msg=str(ex)
-            )
-        d[name]._set_parent(None)
-    dict_subclass_data = extract_dict_subclass_data(obj=obj, parent=dummy_parent)
-    if dict_subclass_data is not None:
-        d.update(dict_subclass_data)
-    return d
+    return _get_fields_data(
+        obj=obj,
+        allow_objects=allow_objects,
+        parent=parent,
+        fields=[
+            (field.name, field.type, partial(class_value, field))
+            for field in get_dataclass_fields(obj)
+        ],
+    )
 
 
 def get_struct_data(
@@ -681,8 +650,30 @@ def get_struct_data(
     allow_objects: Optional[bool] = None,
     parent: Optional["BaseContainer"] = None,
 ) -> Dict[str, Any]:
+    from omegaconf.omegaconf import MISSING
+
+    def class_value(field: SalixField) -> Any:
+        return MISSING if field.default is SALIX_MISSING else field.default
+
+    return _get_fields_data(
+        obj=obj,
+        allow_objects=allow_objects,
+        parent=parent,
+        fields=[
+            (field.name, field.type, partial(class_value, field))
+            for field in salix_fields(get_type_of(obj))
+        ],
+    )
+
+
+def _get_fields_data(
+    obj: Any,
+    allow_objects: Optional[bool],
+    parent: Optional["BaseContainer"],
+    fields: List[Tuple[str, Any, Callable[[], Any]]],
+) -> Dict[str, Any]:
     from omegaconf.base import Node
-    from omegaconf.omegaconf import MISSING, OmegaConf, _maybe_wrap
+    from omegaconf.omegaconf import OmegaConf, _maybe_wrap
 
     flags = {"allow_objects": allow_objects} if allow_objects is not None else {}
     d = {}
@@ -693,23 +684,12 @@ def get_struct_data(
     if parent is not None:
         dummy_parent._set_key(parent._key())
         dummy_parent._set_parent(parent._get_parent())
-    names = obj_type.__struct_fields__  # type: ignore
-    annotations = obj_type.__struct_annotations__  # type: ignore
-    defaults = obj_type.__struct_defaults__  # type: ignore
     resolved_hints = get_type_hints(obj_type)
-    missing = len(names) - len(defaults)
-    for position, name in enumerate(names):
-        is_optional, type_ = _resolve_optional(
-            resolved_hints.get(name, annotations[position])
-        )
+    for name, annotation, class_value in fields:
+        is_optional, type_ = _resolve_optional(resolved_hints.get(name, annotation))
         type_ = _resolve_forward(type_, obj.__module__)
 
-        if not is_type:
-            value = getattr(obj, name)
-        elif position < missing:
-            value = MISSING
-        else:
-            value = defaults[position - missing]
+        value = class_value() if is_type else getattr(obj, name)
         if isinstance(value, Node):
             value = copy.deepcopy(value)
 
