@@ -53,7 +53,7 @@ from .errors import (
 from .grammar_parser import parse
 from .grammar_visitor import GrammarVisitor
 from .typing import Antlr4ParserRuleContext
-from salix import Struct, set_field
+from salix import Struct
 
 DictKeyType = Union[str, bytes, int, Enum, float, bool]
 
@@ -79,12 +79,6 @@ class Metadata(Struct, frozen=False):
 
     resolver_cache: Optional[Dict[str, Any]] = None
 
-    def __setstate__(self, state: Any) -> None:
-        if isinstance(state, dict):
-            for name, value in state.items():
-                set_field(self, name, value)
-        else:
-            super().__setstate__(state)
 
     def __post_init__(self) -> None:
         if self.flags is None:
