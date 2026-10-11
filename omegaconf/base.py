@@ -2,7 +2,6 @@ import copy
 import sys
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
@@ -54,12 +53,12 @@ from .errors import (
 from .grammar_parser import parse
 from .grammar_visitor import GrammarVisitor
 from .typing import Antlr4ParserRuleContext
+from salix import Struct
 
 DictKeyType = Union[str, bytes, int, Enum, float, bool]
 
 
-@dataclass
-class Metadata:
+class Metadata(Struct, frozen=False):
     ref_type: Union[Type[Any], Any]
 
     object_type: Union[Type[Any], Any]
@@ -78,11 +77,14 @@ class Metadata:
     # otherwise, the parent node is queried.
     flags_root: bool = False
 
-    resolver_cache: Dict[str, Any] = field(default_factory=lambda: defaultdict(dict))
+    resolver_cache: Optional[Dict[str, Any]] = None
+
 
     def __post_init__(self) -> None:
         if self.flags is None:
             self.flags = {}
+        if self.resolver_cache is None:
+            self.resolver_cache = defaultdict(dict)
 
     @property
     def type_hint(self) -> Union[Type[Any], Any]:
@@ -96,8 +98,7 @@ class Metadata:
             return self.ref_type
 
 
-@dataclass
-class ContainerMetadata(Metadata):
+class ContainerMetadata(Metadata, frozen=False):
     key_type: Any = None
     element_type: Any = None
 
@@ -113,6 +114,8 @@ class ContainerMetadata(Metadata):
 
         if self.flags is None:
             self.flags = {}
+        if self.resolver_cache is None:
+            self.resolver_cache = defaultdict(dict)
 
 
 class Node(ABC):
@@ -868,7 +871,7 @@ class Container(Box):
 class SCMode(Enum):
     DICT = 1  # Convert to plain dict
     DICT_CONFIG = 2  # Keep as OmegaConf DictConfig
-    INSTANTIATE = 3  # Create a dataclass or attrs class instance
+    INSTANTIATE = 3  # Create a salix Struct instance
 
 
 class UnionNode(Box):

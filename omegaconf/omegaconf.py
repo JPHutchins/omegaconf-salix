@@ -48,8 +48,7 @@ from ._utils import (
     get_list_element_type,
     get_omega_conf_dumper,
     get_type_of,
-    is_attr_class,
-    is_dataclass,
+    is_struct,
     is_dict_annotation,
     is_int,
     is_list_annotation,
@@ -231,9 +230,9 @@ class OmegaConf:
     ) -> Any:
         """
         Alias for ``OmegaConf.create(obj)``. Accepts any input that ``create`` accepts,
-        though intended for structured config objects (dataclass or attrs types/instances).
+        though intended for structured config objects (salix Struct types/instances).
 
-        :param obj: Source object — typically a dataclass or attrs type or instance,
+        :param obj: Source object — typically a salix Struct type or instance,
             but any value accepted by ``OmegaConf.create`` is valid.
         :param parent: Optional parent node.
         :param flags: Optional flags dict (e.g. ``{"readonly": True}``).
@@ -340,7 +339,7 @@ class OmegaConf:
         """
         Create an OmegaConf config from ``obj``.
 
-        ``obj`` may be a YAML string, a dict, a list or tuple, a dataclass or attrs class (type or
+        ``obj`` may be a YAML string, a dict, a list or tuple, a salix Struct class (type or
         instance), an existing ``DictConfig`` / ``ListConfig`` / ``TupleConfig``,
         or ``None``.
         Omitting ``obj`` (or passing ``{}`` explicitly) returns an empty ``DictConfig``.
@@ -473,7 +472,7 @@ class OmegaConf:
         :param f: filename or file object
         :param resolve: True to save a resolved config (defaults to False)
         """
-        if is_dataclass(config) or is_attr_class(config):
+        if is_struct(config):
             config = OmegaConf.create(config)
         data = OmegaConf.to_yaml(config, resolve=resolve)
         if isinstance(f, (str, pathlib.Path)):
@@ -1097,11 +1096,11 @@ class OmegaConf:
         :param throw_on_missing: When True, raise MissingMandatoryValue if any missing values are present.
             When False (the default), replace missing values with the string "???" in the output container.
         :param enum_to_str: True to convert Enum keys and values to strings
-        :param structured_config_mode: Specify how Structured Configs (DictConfigs backed by a dataclass) are handled.
+        :param structured_config_mode: Specify how Structured Configs (DictConfigs backed by a salix Struct) are handled.
             - By default (``structured_config_mode=SCMode.DICT``) structured configs are converted to plain dicts.
             - If ``structured_config_mode=SCMode.DICT_CONFIG``, structured config nodes will remain as DictConfig.
             - If ``structured_config_mode=SCMode.INSTANTIATE``, this function will instantiate structured configs
-              (DictConfigs backed by a dataclass), by creating an instance of the underlying dataclass.
+              (DictConfigs backed by a salix Struct), by creating an instance of the underlying Struct.
 
           See also OmegaConf.to_object.
         :return: A dict, list, or tuple representing this config as a primitive container.
@@ -1144,14 +1143,14 @@ class OmegaConf:
     ) -> Union[Dict[DictKeyType, Any], List[Any], Tuple[Any, ...], None, str, Any]:
         """
         Recursively converts an OmegaConf config to a primitive container.
-        Any DictConfig objects backed by dataclasses or attrs classes are instantiated
+        Any DictConfig objects backed by salix Structs are instantiated
         as instances of those backing classes.
 
         This is an alias for OmegaConf.to_container(..., resolve=True, throw_on_missing=True,
                                                     structured_config_mode=SCMode.INSTANTIATE)
 
         :param cfg: the config to convert
-        :return: A dict, list, tuple, or dataclass representing this config.
+        :return: A dict, list, tuple, or Struct representing this config.
         """
         return OmegaConf.to_container(
             cfg=cfg,
@@ -1259,7 +1258,7 @@ class OmegaConf:
         """
         Return the type of ``obj``, or of ``obj[key]`` when ``key`` is provided.
 
-        For structured configs this is the underlying dataclass or attrs class.
+        For structured configs this is the underlying Struct class.
         For plain containers it is ``dict``, ``list``, or ``tuple``.
 
         :param obj: An OmegaConf node or container.
@@ -1694,7 +1693,7 @@ class OmegaConf:
                     if isinstance(obj, type):
                         raise ValidationError(
                             f"Input class '{obj.__name__}' is not a structured config. "
-                            "did you forget to decorate it as a dataclass?"
+                            "did you forget to subclass salix.Struct?"
                         )
                     else:
                         raise ValidationError(

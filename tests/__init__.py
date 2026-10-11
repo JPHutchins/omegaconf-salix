@@ -1,10 +1,9 @@
 import re
-from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Generic, List, NamedTuple, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
-import attr
 from pytest import warns
+from salix import Struct
 
 from omegaconf import II, MISSING
 
@@ -63,14 +62,12 @@ class Color(Enum):
     BLUE = 3
 
 
-@dataclass
-class User:
+class User(Struct, frozen=False):
     name: str = MISSING
     age: int = MISSING
 
 
-@dataclass
-class Group:
+class Group(Struct, frozen=False):
     admin: Optional[User] = None
 
 
@@ -79,61 +76,50 @@ class Enum1(Enum):
     BAR = 2
 
 
-@dataclass
-class Users:
-    name2user: Dict[str, User] = field(default_factory=dict)
+class Users(Struct, frozen=False):
+    name2user: Dict[str, User] = {}
 
 
-@dataclass
-class OptionalUsers:
-    name2user: Dict[str, Optional[User]] = field(default_factory=dict)
+class OptionalUsers(Struct, frozen=False):
+    name2user: Dict[str, Optional[User]] = {}
 
 
-@dataclass
-class ConfWithMissingDict:
+class ConfWithMissingDict(Struct, frozen=False):
     dict: Dict[str, Any] = MISSING
 
 
-@dataclass
-class Plugin:
+class Plugin(Struct, frozen=False):
     name: str = MISSING
     params: Any = MISSING
 
 
-@dataclass
-class ConcretePlugin(Plugin):
+class ConcretePlugin(Plugin, frozen=False):
     name: str = "foobar_plugin"
 
-    @dataclass
-    class FoobarParams:
+    class FoobarParams(Struct, frozen=False):
         foo: int = 10
 
-    params: FoobarParams = field(default_factory=FoobarParams)
+    params: FoobarParams = FoobarParams()
 
 
-@dataclass
-class NestedInterpolationToMissing:
-    @dataclass
-    class BazParams:
+class NestedInterpolationToMissing(Struct, frozen=False):
+    class BazParams(Struct, frozen=False):
         baz: str = "${..name}"
 
-    subcfg: BazParams = field(default_factory=BazParams)
+    subcfg: BazParams = BazParams()
     name: str = MISSING
 
 
-@dataclass
-class StructuredInterpolationKeyError:
+class StructuredInterpolationKeyError(Struct, frozen=False):
     name: str = "${bar}"
 
 
-@dataclass
-class StructuredInterpolationValidationError:
+class StructuredInterpolationValidationError(Struct, frozen=False):
     x: Optional[int] = None
     y: int = II(".x")
 
 
-@dataclass
-class StructuredWithMissing:
+class StructuredWithMissing(Struct, frozen=False):
     num: int = MISSING
     opt_num: Optional[int] = MISSING
     dict: Dict[str, str] = MISSING
@@ -147,133 +133,103 @@ class StructuredWithMissing:
     inter_opt_user: Optional[User] = II("opt_user")
 
 
-@dataclass
-class StructuredWithBadDict:
+class StructuredWithBadDict(Struct, frozen=False):
     foo: Dict[str, str] = 123  # type: ignore
 
 
-@dataclass
-class StructuredWithBadList:
+class StructuredWithBadList(Struct, frozen=False):
     foo: List[str] = 123  # type: ignore
 
 
-@dataclass
-class MissingList:
+class MissingList(Struct, frozen=False):
     list: List[str] = MISSING
 
 
-@dataclass
-class MissingDict:
+class MissingDict(Struct, frozen=False):
     dict: Dict[str, str] = MISSING
 
 
-@dataclass
-class DictEnum:
-    color_key: Dict[Color, str] = field(default_factory=lambda: {})
-    color_val: Dict[str, Color] = field(default_factory=lambda: {})
+class DictEnum(Struct, frozen=False):
+    color_key: Dict[Color, str] = {}
+    color_val: Dict[str, Color] = {}
 
 
-@dataclass
-class A:
+class A(Struct, frozen=False):
     a: int = 10
 
 
-@dataclass
-class B:
+class B(Struct, frozen=False):
     x: A = MISSING
 
 
-@dataclass
-class C:
+class C(Struct, frozen=False):
     x: Optional[A] = None
 
 
-@dataclass
-class PersonD:
+class PersonD(Struct, frozen=False):
     age: int = 18
     registered: bool = True
 
 
-@attr.s(auto_attribs=True)
-class PersonA:
-    age: int = 18
-    registered: bool = True
-
-
-@dataclass
-class Module:
+class Module(Struct, frozen=False):
     name: str = MISSING
     classes: List[str] = MISSING
 
 
-@dataclass
-class Package:
+class Package(Struct, frozen=False):
     modules: List[Module] = MISSING
 
 
-@dataclass
-class UntypedList:
-    list: List = field(default_factory=lambda: [1, 2])  # type: ignore
+class UntypedList(Struct, frozen=False):
+    list: List = [1, 2]  # type: ignore
     opt_list: Optional[List] = None  # type: ignore
 
 
-@dataclass
-class SubscriptedList:
-    list: List[int] = field(default_factory=lambda: [1, 2])
+class SubscriptedList(Struct, frozen=False):
+    list: List[int] = [1, 2]
 
 
-@dataclass
-class SubscriptedListOpt:
-    opt_list: Optional[List[int]] = field(default_factory=lambda: [1, 2])
-    list_opt: List[Optional[int]] = field(default_factory=lambda: [1, 2, None])
+class SubscriptedListOpt(Struct, frozen=False):
+    opt_list: Optional[List[int]] = [1, 2]
+    list_opt: List[Optional[int]] = [1, 2, None]
 
 
-@dataclass
-class ListOfAny:
+class ListOfAny(Struct, frozen=False):
     list: List[Any]
 
 
-@dataclass
-class UntypedDict:
-    dict: Dict = field(default_factory=lambda: {"foo": "var"})  # type: ignore
+class UntypedDict(Struct, frozen=False):
+    dict: Dict = {"foo": "var"}  # type: ignore
     opt_dict: Optional[Dict] = None  # type: ignore
 
 
-@dataclass
-class SubscriptedDict:
-    dict_str: Dict[str, int] = field(default_factory=lambda: {"foo": 4})
-    dict_enum: Dict[Color, int] = field(default_factory=lambda: {Color.RED: 4})
-    dict_int: Dict[int, int] = field(default_factory=lambda: {123: 4})
-    dict_float: Dict[float, int] = field(default_factory=lambda: {123.45: 4})
-    dict_bool: Dict[bool, int] = field(default_factory=lambda: {True: 4, False: 5})
-    dict_bytes: Dict[bytes, int] = field(default_factory=lambda: {b"binary": 4})
+class SubscriptedDict(Struct, frozen=False):
+    dict_str: Dict[str, int] = {"foo": 4}
+    dict_enum: Dict[Color, int] = {Color.RED: 4}
+    dict_int: Dict[int, int] = {123: 4}
+    dict_float: Dict[float, int] = {123.45: 4}
+    dict_bool: Dict[bool, int] = {True: 4, False: 5}
+    dict_bytes: Dict[bytes, int] = {b"binary": 4}
 
 
-@dataclass
-class SubscriptedDictOpt:
-    opt_dict: Optional[Dict[str, int]] = field(default_factory=lambda: {"foo": 4})
-    dict_opt: Dict[str, Optional[int]] = field(
-        default_factory=lambda: {"foo": 4, "bar": None}
-    )
+class SubscriptedDictOpt(Struct, frozen=False):
+    opt_dict: Optional[Dict[str, int]] = {"foo": 4}
+    dict_opt: Dict[str, Optional[int]] = {"foo": 4, "bar": None}
 
 
-@dataclass
-class DictOfAny:
+class DictOfAny(Struct, frozen=False):
     dict: Dict[Any, Any]
 
 
-@dataclass
-class InterpolationList:
+class InterpolationList(Struct, frozen=False):
     list: List[float] = II("optimization.lr")
 
 
-@dataclass
-class InterpolationDict:
+class InterpolationDict(Struct, frozen=False):
     dict: Dict[str, int] = II("optimization.lr")
 
 
-@dataclass
-class Str2Int(Dict[str, int]):
+class Str2Int(Struct, Dict[str, int], frozen=False):
     pass
 
 
@@ -285,29 +241,22 @@ class ListSubclass(List[Any]):
     pass
 
 
-class Shape(NamedTuple):
-    channels: int
-    height: int
-    width: int
+class Shape(Tuple[int, int, int]):
+    pass
 
 
-@dataclass
-class OptTuple:
+class OptTuple(Struct, frozen=False):
     x: Optional[Tuple[int, ...]] = None
 
 
-@dataclass
-class NestedContainers:
-    dict_of_dict: Dict[str, Dict[str, int]] = field(
-        default_factory=lambda: {"foo": {"bar": 123}}
-    )
-    list_of_list: List[List[int]] = field(default_factory=lambda: [[123]])
-    dict_of_list: Dict[str, List[int]] = field(default_factory=lambda: {"foo": [123]})
-    list_of_dict: List[Dict[str, int]] = field(default_factory=lambda: [{"bar": 123}])
+class NestedContainers(Struct, frozen=False):
+    dict_of_dict: Dict[str, Dict[str, int]] = {"foo": {"bar": 123}}
+    list_of_list: List[List[int]] = [[123]]
+    dict_of_list: Dict[str, List[int]] = {"foo": [123]}
+    list_of_dict: List[Dict[str, int]] = [{"bar": 123}]
 
 
-@dataclass
-class UnionAnnotations:
+class UnionAnnotations(Struct, frozen=False):
     ubf: Union[bool, float] = True
     oubf: Optional[Union[bool, float]] = None
 
@@ -323,22 +272,18 @@ def warns_dict_subclass_deprecated(dict_subclass: Any) -> Any:
     )
 
 
-@dataclass
-class InnerX:
+class InnerX(Struct, frozen=False):
     d: int
     p: int
 
 
-@dataclass
-class InnerY(InnerX):
+class InnerY(InnerX, frozen=False):
     q: int
 
 
-@dataclass
-class OuterA:
+class OuterA(Struct, frozen=False):
     x: InnerX
 
 
-@dataclass
-class OuterB(OuterA):
+class OuterB(OuterA, frozen=False):
     x: InnerY  # pyrefly: ignore[bad-override-mutable-attribute]

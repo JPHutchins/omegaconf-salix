@@ -1,7 +1,7 @@
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 from pytest import mark, raises
+from salix import Struct
 
 from omegaconf import (
     DictConfig,
@@ -14,19 +14,16 @@ from omegaconf.basecontainer import _deep_update_type_hint
 from omegaconf.errors import ConfigTypeError
 
 
-@dataclass
-class TupleHolder:
+class TupleHolder(Struct, frozen=False):
     value: Tuple[Dict[str, int], ...] = ({"old": 1},)
 
 
-@dataclass
-class SequenceHolder:
+class SequenceHolder(Struct, frozen=False):
     tuple_value: Tuple[int, str] = (1, "x")
-    list_value: List[int] = field(default_factory=list)
+    list_value: List[int] = []
 
 
-@dataclass
-class OptionalFixedTupleHolder:
+class OptionalFixedTupleHolder(Struct, frozen=False):
     value: Optional[Tuple[int, str]] = None
 
 

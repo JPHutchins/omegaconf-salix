@@ -15,7 +15,6 @@ from omegaconf import (
 )
 from omegaconf._utils import _ensure_container
 from omegaconf.errors import (
-    ConfigTypeError,
     InterpolationKeyError,
     InterpolationResolutionError,
     InterpolationToMissingValueError,
@@ -337,10 +336,7 @@ def test_to_container_resolves_referenced_node_once(
 
 class TestInstantiateStructuredConfigs:
     @fixture(
-        params=[
-            "tests.structured_conf.data.dataclasses",
-            "tests.structured_conf.data.attr_classes",
-        ]
+        params=["tests.structured_conf.data.structs"]
     )
     def module(self, request: Any) -> Any:
         return import_module(request.param)
@@ -524,73 +520,13 @@ class TestInstantiateStructuredConfigs:
         assert data.hello == "world"
 
     def test_setattr_for_user_with_extra_field(self, module: Any) -> None:
-        cfg = OmegaConf.structured(module.User(name="James Bond", age=7))
+        cfg = OmegaConf.structured(module.ExtensibleUser(name="James Bond", age=7))
         with open_dict(cfg):
             cfg.extra_field = 123
 
         user: Any = OmegaConf.to_object(cfg)
-        assert type(user) is module.User
+        assert type(user) is module.ExtensibleUser
         assert user.extra_field == 123
-
-    def test_init_false_with_default(self, module: Any) -> None:
-        cfg = OmegaConf.structured(module.HasInitFalseFields)
-        assert cfg.with_default == "default"
-        data = self.round_trip_to_object(cfg)
-        assert data.with_default == "default"
-
-    def test_init_false_with_default_overridden(self, module: Any) -> None:
-        cfg = OmegaConf.structured(module.HasInitFalseFields)
-        cfg.with_default = "default_overridden"
-        data = self.round_trip_to_object(cfg)
-        assert data.with_default == "default_overridden"
-
-    def test_init_false_without_default(self, module: Any) -> None:
-        cfg = OmegaConf.structured(module.HasInitFalseFields)
-        assert OmegaConf.is_missing(cfg, "without_default")
-        data = self.round_trip_to_object(cfg)
-        assert not hasattr(data, "without_default")
-
-    def test_init_false_without_default_overridden(self, module: Any) -> None:
-        cfg = OmegaConf.structured(module.HasInitFalseFields)
-        cfg.with_default = "default_overridden"
-        data = self.round_trip_to_object(cfg)
-        assert data.with_default == "default_overridden"
-
-    def test_init_false_post_initialized(self, module: Any) -> None:
-        cfg = OmegaConf.structured(module.HasInitFalseFields)
-        assert OmegaConf.is_missing(cfg, "post_initialized")
-        data = self.round_trip_to_object(cfg)
-        assert data.post_initialized == "set_by_post_init"
-
-    def test_init_false_post_initialized_overridden(self, module: Any) -> None:
-        cfg = OmegaConf.structured(module.HasInitFalseFields)
-        cfg.post_initialized = "overridden"
-        data = self.round_trip_to_object(cfg)
-        assert data.post_initialized == "overridden"
-
-    def test_ignore_metadata_with_required_args(self, module: Any) -> None:
-        """
-        Given a dataclass/attr class that has a field with no default value and with
-        metadata["omegaconf_ignore"] == True, test that OmegaConf.to_object(cfg) fails.
-        """
-        cfg = OmegaConf.structured(module.HasIgnoreMetadataRequired(1, 2))
-        assert cfg.keys() == {"no_ignore"}
-        with raises(
-            ConfigTypeError,
-            match=r"Could not create instance of `HasIgnoreMetadataRequired`: "
-            + r".*__init__\(\) missing 1 required positional argument: 'ignore'",
-        ):
-            OmegaConf.to_object(cfg)
-
-    def test_ignore_metadata_with_default_args(self, module: Any) -> None:
-        """
-        Given a dataclass/attr class that has a field with a default value and with
-        metadata["omegaconf_ignore"] == True, test that OmegaConf.to_object(cfg) succeeds.
-        """
-        cfg = OmegaConf.structured(module.HasIgnoreMetadataWithDefault(3, 4))
-        assert cfg == {"no_ignore": 4}
-        data = OmegaConf.to_object(cfg)
-        assert data == module.HasIgnoreMetadataWithDefault(1, 4)
 
     def test_leading_underscore_fields(self, module: Any) -> None:
         cfg = OmegaConf.structured(module.LeadingUnderscoreFields)

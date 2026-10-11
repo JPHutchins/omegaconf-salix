@@ -5,14 +5,13 @@ import re
 import sys
 from collections import OrderedDict
 from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Dict, List, Optional
 
-import attr
 import yaml
 from pytest import mark, param, raises
+from salix import Struct
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
 from omegaconf.errors import ReadonlyConfigError, UnsupportedValueType, ValidationError
@@ -134,7 +133,7 @@ def test_create_allow_objects_non_copyable(input_: Any) -> None:
 @mark.parametrize(
     "input_",
     [
-        param(Shape(10, 2, 3), id="shape"),
+        param(Shape((10, 2, 3)), id="shape"),
         param(ListSubclass((1, 2, 3)), id="list_subclass"),
         param(DictSubclass({"key": "value"}), id="dict_subclass"),
     ],
@@ -302,30 +301,11 @@ def test_create_node_parent_retained_on_create(node: Any) -> None:
     assert cfg1.foo._get_parent() is cfg1
 
 
-def test_structured_dataclass_node_parent_retained_on_create() -> None:
-    @dataclass
-    class User:
+def test_structured_struct_node_parent_retained_on_create() -> None:
+    class User(Struct, frozen=False):
         name: str = "Bond"
 
-    @dataclass
-    class HasUser:
-        user: User
-
-    cfg1 = OmegaConf.structured(HasUser(User()))
-    cfg2 = OmegaConf.structured(HasUser(cfg1.user))
-
-    assert cfg1.user._get_parent() is cfg1
-    assert cfg2.user._get_parent() is cfg2
-    assert cfg1.user is not cfg2.user
-
-
-def test_structured_attr_node_parent_retained_on_create() -> None:
-    @attr.s(auto_attribs=True)
-    class User:
-        name: str = "Bond"
-
-    @attr.s(auto_attribs=True)
-    class HasUser:
+    class HasUser(Struct, frozen=False):
         user: User
 
     cfg1 = OmegaConf.structured(HasUser(User()))

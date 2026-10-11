@@ -1,10 +1,10 @@
 import inspect
 from collections.abc import Sequence
-from dataclasses import dataclass
 from functools import partial
 from typing import Annotated, Any, Literal, Optional, Protocol, TypedDict, TypeVar
 
 from pytest import mark, raises, warns
+from salix import Struct
 
 from omegaconf import DictConfig, ListConfig, OmegaConf, TupleConfig
 from omegaconf.errors import InterpolationResolutionError
@@ -427,8 +427,7 @@ def test_cached_return_mismatch_identifies_cache(
 
 
 def test_target_node_validation_remains_independent(restore_resolvers: Any) -> None:
-    @dataclass
-    class Config:
+    class Config(Struct, frozen=False):
         value: int = "${typed:}"  # type: ignore[assignment]
 
     def resolver() -> str:

@@ -1,12 +1,12 @@
 import gc
 import re
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from pytest import mark, param, raises, warns
+from salix import Struct
 
 import tests
 from omegaconf import (
@@ -68,18 +68,15 @@ def _register_resolver(register_func: Any, name: str, resolver: Any) -> None:
 
 
 # tests classes
-@dataclass
-class NotOptionalInt:
+class NotOptionalInt(Struct, frozen=False):
     foo: int = None  # type: ignore
 
 
-@dataclass
-class NotOptionalA:
+class NotOptionalA(Struct, frozen=False):
     x: A = None  # type: ignore
 
 
-@dataclass
-class Expected:
+class Expected(Struct, frozen=False):
     exception_type: Type[Exception]
     msg: str
     msg_is_regex: bool = False
@@ -577,7 +574,7 @@ params = [
             msg="Plugin is not a subclass of ConcretePlugin. value: {'name': '???', 'params': '???'}",
             object_type=ConcretePlugin,
         ),
-        id="structured:merge_invalid_dataclass",
+        id="structured:merge_invalid_struct",
     ),
     # get
     param(
@@ -701,7 +698,7 @@ params = [
             create=lambda: None,
             op=lambda cfg: OmegaConf.structured(IllegalType),
             exception_type=ValidationError,
-            msg="Input class 'IllegalType' is not a structured config. did you forget to decorate it as a dataclass?",
+            msg="Input class 'IllegalType' is not a structured config. did you forget to subclass salix.Struct?",
             object_type_str=None,
             ref_type_str=None,
         ),
@@ -1760,8 +1757,7 @@ def test_omegaconf_error_paths_release_frame_locals(
 ) -> None:
     """Verify swallowed OmegaConf exceptions release frame locals without cyclic GC."""
 
-    @dataclass
-    class OneInt:
+    class OneInt(Struct, frozen=False):
         x: int = 10
 
     class FrameLocal:

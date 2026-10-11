@@ -4,69 +4,57 @@ Tests for Union[List[...], Dict[...], ...] support (issue #1261).
 
 import copy
 import pickle
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from pytest import mark, param, raises
+from salix import Struct
 
 from omegaconf import OmegaConf, ReadonlyConfigError, TupleConfig, ValidationError
 from omegaconf._utils import is_supported_union_annotation
 
 # ---------------------------------------------------------------------------
-# Dataclasses for structured-config tests
+# Structs for structured-config tests
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class CfgIntOrListStr:
+class CfgIntOrListStr(Struct, frozen=False):
     value: Union[int, List[str]] = 0
 
 
-@dataclass
-class CfgIntOrDictStrInt:
+class CfgIntOrDictStrInt(Struct, frozen=False):
     value: Union[int, Dict[str, int]] = 0
 
 
-@dataclass
-class CfgListIntOrListStr:
-    value: Union[List[int], List[str]] = field(default_factory=lambda: [1, 2])
+class CfgListIntOrListStr(Struct, frozen=False):
+    value: Union[List[int], List[str]] = [1, 2]
 
 
-@dataclass
-class CfgDictStrIntOrDictStrStr:
-    value: Union[Dict[str, int], Dict[str, str]] = field(
-        default_factory=lambda: {"x": 1}
-    )
+class CfgDictStrIntOrDictStrStr(Struct, frozen=False):
+    value: Union[Dict[str, int], Dict[str, str]] = {"x": 1}
 
 
-@dataclass
-class CfgDictOrList:
-    value: Union[Dict[str, int], List[int]] = field(default_factory=lambda: [1])
+class CfgDictOrList(Struct, frozen=False):
+    value: Union[Dict[str, int], List[int]] = [1]
 
 
-@dataclass
-class CfgMissing:
-    value: Union[List[int], List[str]] = field(default_factory=lambda: [1])
+class CfgMissing(Struct, frozen=False):
+    value: Union[List[int], List[str]] = [1]
 
 
-@dataclass
-class CfgListOrTupleInt:
-    value: Union[List[int], Tuple[int, ...]] = field(default_factory=lambda: [1])
+class CfgListOrTupleInt(Struct, frozen=False):
+    value: Union[List[int], Tuple[int, ...]] = [1]
 
 
-@dataclass
-class CfgTupleIntOrTupleStr:
+class CfgTupleIntOrTupleStr(Struct, frozen=False):
     value: Union[Tuple[int, ...], Tuple[str, ...]] = (1,)
 
 
-@dataclass
-class CfgBuiltinTupleIntOrTupleStr:
+class CfgBuiltinTupleIntOrTupleStr(Struct, frozen=False):
     value: Union[tuple[int, ...], tuple[str, ...]] = (1,)
 
 
-@dataclass
-class CfgListIntOrTupleStr:
-    value: Union[List[int], Tuple[str, ...]] = field(default_factory=lambda: [1])
+class CfgListIntOrTupleStr(Struct, frozen=False):
+    value: Union[List[int], Tuple[str, ...]] = [1]
 
 
 # ---------------------------------------------------------------------------
@@ -122,9 +110,8 @@ class TestStructuredConfigCreation:
 
 
 def test_inherited_flag_cache_is_invalidated_through_container_union() -> None:
-    @dataclass
-    class Config:
-        value: Union[List[int], int] = field(default_factory=lambda: [1])
+    class Config(Struct, frozen=False):
+        value: Union[List[int], int] = [1]
 
     cfg = OmegaConf.structured(Config)
     value = cfg.value
@@ -537,9 +524,8 @@ class TestMerge:
 
 class TestInterpolation:
     def test_interpolation_resolves_to_list(self) -> None:
-        @dataclass
-        class Cfg:
-            items: List[int] = field(default_factory=lambda: [1, 2, 3])
+        class Cfg(Struct, frozen=False):
+            items: List[int] = [1, 2, 3]
             value: Union[int, List[int]] = 0
 
         cfg = OmegaConf.structured(Cfg)
@@ -547,9 +533,8 @@ class TestInterpolation:
         assert cfg.value == [1, 2, 3]
 
     def test_missing_is_accepted(self) -> None:
-        @dataclass
-        class Cfg:
-            value: Union[List[int], List[str]] = field(default_factory=lambda: [1])
+        class Cfg(Struct, frozen=False):
+            value: Union[List[int], List[str]] = [1]
 
         cfg = OmegaConf.structured(Cfg)
         cfg.value = "???"

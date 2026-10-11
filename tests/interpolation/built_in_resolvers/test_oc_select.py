@@ -1,7 +1,7 @@
-from dataclasses import dataclass
 from typing import Any
 
 from pytest import mark, raises
+from salix import Struct
 
 from omegaconf import SI, OmegaConf
 from omegaconf.errors import InterpolationKeyError
@@ -110,8 +110,7 @@ def test_oc_select_default_for_relative_key_above_root() -> None:
 
 
 def test_oc_select_default_for_relative_key_above_root_in_structured_config() -> None:
-    @dataclass
-    class Config:
+    class Config(Struct, frozen=False):
         a: int = SI("${oc.select:..member, 5}")
 
     cfg = OmegaConf.structured(Config)

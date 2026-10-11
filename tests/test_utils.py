@@ -1,13 +1,14 @@
+import os
 import re
+import subprocess
 import sys
 from collections import OrderedDict
-from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
-import attr
 from pytest import mark, param, raises
+from salix import Struct
 
 from omegaconf import DictConfig, ListConfig, Node, OmegaConf, UnionNode, _utils
 from omegaconf._utils import (  # _normalize_ref_type,
@@ -31,7 +32,7 @@ from omegaconf._utils import (  # _normalize_ref_type,
     is_union_annotation,
     split_key,
 )
-from omegaconf.errors import ConfigValueError, UnsupportedValueType, ValidationError
+from omegaconf.errors import UnsupportedValueType, ValidationError
 from omegaconf.nodes import (
     AnyNode,
     BooleanNode,
@@ -58,7 +59,7 @@ from tests import (
     UnionAnnotations,
     User,
 )
-from tests.structured_conf.data.dataclasses import HasForwardRef
+from tests.structured_conf.data.structs import HasForwardRef
 
 
 class DummyEnum(Enum):
@@ -277,22 +278,7 @@ class _TestEnum(Enum):
     B = 2
 
 
-@dataclass
-class _TestDataclass:
-    x: int = 10
-    s: str = "foo"
-    b: bool = True
-    p: Path = Path("hello.txt")
-    d: bytes = b"123"
-    f: float = 3.14
-    e: _TestEnum = _TestEnum.A
-    list1: List[int] = field(default_factory=list)
-    dict1: Dict[str, int] = field(default_factory=dict)
-    init_false: str = field(init=False, default="foo")
-
-
-@attr.s(auto_attribs=True)
-class _TestAttrsClass:
+class _TestStruct(Struct, frozen=False):
     x: int = 10
     s: str = "foo"
     b: bool = True
@@ -302,31 +288,9 @@ class _TestAttrsClass:
     e: _TestEnum = _TestEnum.A
     list1: List[int] = []
     dict1: Dict[str, int] = {}
-    init_false: str = attr.field(init=False, default="foo")
 
 
-@attr.s(auto_attribs=True)
-class _TestAttrsTakesSelf:
-    x: int = 10
-    s: str = "foo"
-    description: str = attr.Factory(lambda self: f"{self.x}, {self.s}", takes_self=True)
-
-
-@attr.s(auto_attribs=True)
-class _TestAttrsFactory:
-    list1: List[int] = attr.Factory(list)
-    dict1: Dict[str, int] = attr.Factory(dict)
-    x: int = attr.Factory(lambda: 10)
-    s: str = attr.Factory(lambda: "foo")
-
-
-@dataclass
-class _TestDataclassIllegalValue:
-    x: Any = field(default_factory=IllegalType)
-
-
-@attr.s(auto_attribs=True)
-class _TestAttrIllegalValue:
+class _TestStructIllegalValue(Struct, frozen=False):
     x: Any = IllegalType()
 
 
@@ -347,8 +311,7 @@ class _TestUserClass:
         (_TestEnum, True),
         (_TestUserClass, False),
         # Nesting structured configs in contain
-        (_TestAttrsClass, True),
-        (_TestDataclass, True),
+        (_TestStruct, True),
         # container annotations
         (List[int], True),
         (Dict[str, int], True),
@@ -361,8 +324,7 @@ class _TestUserClass:
         (Union[int, List[str]], True),
         (Union[int, Dict[int, str]], True),
         (Union[int, _TestEnum], True),
-        (Union[int, _TestAttrsClass], True),
-        (Union[int, _TestDataclass], True),
+        (Union[int, _TestStruct], True),
         (Union[int, _TestUserClass], False),
     ],
 )
@@ -375,7 +337,7 @@ def test_is_valid_value_annotation(type_: type, expected: bool) -> None:
 class TestGetStructuredConfigInfo:
     @mark.parametrize(
         "test_cls_or_obj",
-        [_TestDataclass, _TestDataclass(), _TestAttrsClass, _TestAttrsClass()],
+        [_TestStruct, _TestStruct()],
     )
     def test_get_structured_config_data(self, test_cls_or_obj: Any) -> None:
         d = _utils.get_structured_config_data(test_cls_or_obj)
@@ -395,7 +357,7 @@ class TestGetStructuredConfigInfo:
 
     @mark.parametrize(
         "test_cls_or_obj",
-        [_TestDataclass, _TestDataclass(), _TestAttrsClass, _TestAttrsClass()],
+        [_TestStruct, _TestStruct()],
     )
     def test_get_structured_config_field_aliases(self, test_cls_or_obj: Any) -> None:
         field_names = _utils.get_structured_config_init_field_aliases(test_cls_or_obj)
@@ -408,13 +370,7 @@ class TestGetStructuredConfigInfo:
             _utils.get_structured_config_init_field_aliases("invalid")
 
 
-@mark.parametrize(
-    "test_cls",
-    [
-        _TestDataclassIllegalValue,
-        _TestAttrIllegalValue,
-    ],
-)
+@mark.parametrize("test_cls", [_TestStructIllegalValue])
 def test_get_structured_config_data_illegal_value(test_cls: Any) -> None:
     with raises(UnsupportedValueType):
         _utils.get_structured_config_data(test_cls, allow_objects=None)
@@ -426,52 +382,77 @@ def test_get_structured_config_data_illegal_value(test_cls: Any) -> None:
     assert d["x"] == IllegalType()
 
 
-def test_get_structured_config_data_attrs_takes_self() -> None:
-    test_cls = _TestAttrsTakesSelf
-    with raises(
-        ConfigValueError, match="'takes_self' in attrs attributes is not supported"
-    ):
-        _utils.get_structured_config_data(test_cls)
-
-
-def test_get_structured_config_data_attrs_factory() -> None:
-    test_cls = _TestAttrsFactory
-    d = _utils.get_structured_config_data(test_cls)
-    assert d["list1"] == []
-    assert d["dict1"] == {}
-    assert d["x"] == 10
-    assert d["s"] == "foo"
-
-
-def test_is_dataclass(mocker: Any) -> None:
-    @dataclass
-    class Foo:
+def test_is_struct() -> None:
+    class Foo(Struct, frozen=False):
         pass
 
-    assert _utils.is_dataclass(Foo)
-    assert _utils.is_dataclass(Foo())
-    assert not _utils.is_dataclass(10)
+    assert _utils.is_struct(Foo)
+    assert _utils.is_struct(Foo())
+    assert not _utils.is_struct(10)
 
 
-def test_is_attr_class(mocker: Any) -> None:
-    @attr.s
-    class Foo:
-        pass
+def test_importing_omegaconf_imports_neither_attr_nor_dataclasses() -> None:
+    probe = (
+        "import sys\n"
+        "import omegaconf\n"
+        "print(sorted(name for name in ('attr', 'dataclasses') if name in sys.modules))\n"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        check=True,
+        env={"PYTHONPATH": os.pathsep.join(sys.path)},
+    )
+    assert completed.stdout.strip() == "[]"
 
-    assert _utils.is_attr_class(Foo)
-    assert _utils.is_attr_class(Foo())
 
-    assert not _utils.is_attr_class(10)
-    mocker.patch("omegaconf._utils.attr", None)
-    assert not _utils.is_attr_class(10)
+class FrozenStruct(Struct, frozen=True):
+    x: int = 1
+
+
+class MutableStruct(Struct, frozen=False):
+    x: int = 1
+
+
+class MutableStructWithSetattrHook(Struct, frozen=False):
+    x: int = 1
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        object.__setattr__(self, name, value)
+
+
+class FrozenStructSubclass(FrozenStruct):
+    pass
+
+
+@mark.parametrize(
+    "type_,expected",
+    [
+        (FrozenStruct, True),
+        (FrozenStructSubclass, True),
+        (MutableStruct, False),
+        (MutableStructWithSetattrHook, False),
+    ],
+)
+def test_is_struct_frozen(type_: Any, expected: bool) -> None:
+    assert _utils.is_struct(type_)
+    assert _utils.is_struct(type_())
+    assert _utils.is_struct_frozen(type_) is expected
+    assert _utils.is_structured_config_frozen(type_) is expected
+    assert _utils.is_structured_config_frozen(type_()) is expected
+
+
+def test_is_struct_rejects_non_structs() -> None:
+    assert not _utils.is_struct(10)
+    assert not _utils.is_struct(_TestUserClass)
 
 
 def test_is_structured_config_frozen_with_invalid_obj() -> None:
     assert not _utils.is_structured_config_frozen(10)
 
 
-@dataclass
-class Dataclass:
+class StructClass(Struct, frozen=False):
     pass
 
 
@@ -486,7 +467,7 @@ class Dataclass:
         (True, _utils.ValueKind.VALUE),
         (False, _utils.ValueKind.VALUE),
         (Color.GREEN, _utils.ValueKind.VALUE),
-        (Dataclass, _utils.ValueKind.VALUE),
+        (StructClass, _utils.ValueKind.VALUE),
         (Dataframe(), _utils.ValueKind.VALUE),
         (IntegerNode(123), _utils.ValueKind.VALUE),
         (DictConfig({}), _utils.ValueKind.VALUE),
@@ -568,13 +549,13 @@ def test_re_parent() -> None:
 def test_get_class() -> None:
     assert (
         _utils._get_class(
-            "tests.examples.test_dataclass_example", "SimpleTypes"
+            "tests.examples.test_struct_example", "SimpleTypes"
         ).__name__
         == "SimpleTypes"
     )
     assert (
         _utils._get_class(
-            "tests.structured_conf.data.dataclasses", "HasForwardRef.CA"
+            "tests.structured_conf.data.structs", "HasForwardRef.CA"
         ).__name__
         == "CA"
     )
@@ -585,7 +566,7 @@ def test_get_class() -> None:
         _utils._get_class("foo", "not_found")
 
     with raises(ImportError):
-        _utils._get_class("tests.examples.test_dataclass_example", "not_found")
+        _utils._get_class("tests.examples.test_struct_example", "not_found")
 
 
 @mark.parametrize(
@@ -749,7 +730,7 @@ def test_type_str_nonetype(type_: Any, expected: str) -> None:
         param((1,), True, id="tuple1"),
         param({}, False, id="dict"),
         param(ListSubclass(), True, id="list_subclass"),
-        param(Shape(10, 2, 3), True, id="namedtuple"),
+        param(Shape((10, 2, 3)), True, id="tuple_subclass"),
     ],
 )
 def test_is_primitive_list(obj: Any, expected: bool) -> None:
@@ -777,7 +758,7 @@ def test_is_primitive_dict(obj: Any, expected: bool) -> None:
         param(DictConfig({}), id="dictconfig"),
         param(ListConfig([]), id="listconfig"),
         param(DictSubclass(), id="dict_subclass"),
-        param(Str2Int(), id="dict_subclass_dataclass"),
+        param(Str2Int(), id="dict_subclass_struct"),
         param(User, id="user"),
         param(User("bond", 7), id="user"),
     ],
@@ -1109,7 +1090,7 @@ def test_ensure_container_raises_ValueError() -> None:
         ValueError,
         match=re.escape(
             "Invalid input. Supports one of "
-            + "[dict,list,tuple,DictConfig,ListConfig,TupleConfig,dataclass,dataclass instance,attr class,attr class instance]"
+            + "[dict,list,tuple,DictConfig,ListConfig,TupleConfig,Struct,Struct instance]"
         ),
     ):
         _ensure_container("abc")
@@ -1690,5 +1671,5 @@ def test_resolve_optional_support_pep_604() -> None:
 def test_resolve_forward(type_: Any, expected: Any) -> None:
     module = "builtins"
     if expected == List[HasForwardRef.CA]:
-        module = "tests.structured_conf.data.dataclasses"
+        module = "tests.structured_conf.data.structs"
     assert _resolve_forward(type_, module) == expected

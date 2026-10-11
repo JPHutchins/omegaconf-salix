@@ -6,6 +6,7 @@ from textwrap import dedent
 from typing import Any, Callable, List, MutableSequence, Optional, Union
 
 from pytest import mark, param, raises
+from salix import Struct
 
 from omegaconf import (
     MISSING,
@@ -159,18 +160,15 @@ def test_iterate_list_with_missing_interpolation() -> None:
         next(itr)
 
 
-def test_structured_list_of_dataclasses_with_missing_default_factory() -> None:
-    # Regression test for #788: constructing a List[Dataclass] whose default_factory
+def test_structured_list_of_structs_with_missing_default() -> None:
+    # Regression test for #788: constructing a List[Struct] whose default
     # returns [MISSING] used to raise ValidationError
-    from dataclasses import dataclass, field
 
-    @dataclass
-    class Item:
+    class Item(Struct, frozen=False):
         x: int = 0
 
-    @dataclass
-    class Cfg:
-        entries: List[Item] = field(default_factory=lambda: [MISSING])
+    class Cfg(Struct, frozen=False):
+        entries: List[Item] = [MISSING]
 
     cfg = OmegaConf.structured(Cfg)
     assert OmegaConf.is_missing(cfg.entries, 0)
@@ -184,15 +182,12 @@ def test_structured_list_of_dataclasses_with_missing_default_factory() -> None:
 def test_optional_structured_list_accepts_null_container(
     null_container: Any,
 ) -> None:
-    from dataclasses import dataclass, field
 
-    @dataclass
-    class Item:
+    class Item(Struct, frozen=False):
         x: int = 0
 
-    @dataclass
-    class Cfg:
-        entries: List[Optional[Item]] = field(default_factory=list)
+    class Cfg(Struct, frozen=False):
+        entries: List[Optional[Item]] = []
 
     cfg = OmegaConf.structured(Cfg)
     cfg.entries.append(null_container)
@@ -211,11 +206,9 @@ def test_iterate_list_of_union() -> None:
     # Regression test for the UnionNode leak: iterating a List[Union[...]] used
     # to yield UnionNode wrappers instead of the selected concrete values, while
     # indexing already unwrapped them.
-    from dataclasses import dataclass, field
 
-    @dataclass
-    class Cfg:
-        a: List[Union[float, int]] = field(default_factory=lambda: [0.8, 9])
+    class Cfg(Struct, frozen=False):
+        a: List[Union[float, int]] = [0.8, 9]
 
     cfg = OmegaConf.structured(Cfg)
 

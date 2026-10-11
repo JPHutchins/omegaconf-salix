@@ -2,11 +2,11 @@
 # otherwise a syntax error is raised
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
 from enum import Enum
 from pathlib import Path
 
 from pytest import raises
+from salix import Struct, fields
 
 from omegaconf import OmegaConf, ValidationError
 
@@ -16,8 +16,7 @@ class Height(Enum):
     TALL = 1
 
 
-@dataclass
-class SimpleTypes:
+class SimpleTypes(Struct, frozen=False):
     num: int = 10
     pi: float = 3.1415
     is_awesome: bool = True

@@ -62,7 +62,7 @@ def verify(
     assert OmegaConf.is_interpolation(cfg, key) == inter
 
 
-# for each type Node type: int, bool, str, bytes, float, Color (enum) and User (@dataclass), DictConfig, ListConfig
+# for each type Node type: int, bool, str, bytes, float, Color (enum) and User (Struct), DictConfig, ListConfig
 #   for each MISSING, None, Optional and interpolation:
 @mark.parametrize(
     "node_type, values",
@@ -101,7 +101,7 @@ def verify(
             ),
             [[], [1, 2, 3]],
         ),
-        # dataclass
+        # Struct
         (
             lambda value, is_optional, key=None: DictConfig(
                 ref_type=Group, is_optional=is_optional, content=value, key=key
@@ -120,7 +120,7 @@ def verify(
         "UnionNode",
         "DictConfig",
         "ListConfig",
-        "dataclass",
+        "Struct",
     ),
 )
 class TestNodeTypesMatrix:
