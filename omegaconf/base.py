@@ -58,16 +58,6 @@ from salix import Struct, set_field
 DictKeyType = Union[str, bytes, int, Enum, float, bool]
 
 
-def _rebuild_metadata(cls_path: Tuple[str, str], state: Dict[str, Any]) -> "Metadata":
-    module, qualname = cls_path
-    cls: Any = sys.modules[module]
-    for part in qualname.split("."):
-        cls = getattr(cls, part)
-    obj = cls(**state)
-    obj.__setstate__(state)
-    return obj
-
-
 class Metadata(Struct, frozen=False):
     ref_type: Union[Type[Any], Any]
 
@@ -89,18 +79,12 @@ class Metadata(Struct, frozen=False):
 
     resolver_cache: Optional[Dict[str, Any]] = None
 
-    def __getstate__(self) -> Dict[str, Any]:
-        return {name: getattr(self, name) for name in type(self).__struct_fields__}
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        for name, value in state.items():
-            set_field(self, name, value)
-
-    def __reduce__(self) -> Any:
-        return (
-            _rebuild_metadata,
-            ((type(self).__module__, type(self).__qualname__), self.__getstate__()),
-        )
+    def __setstate__(self, state: Any) -> None:
+        if isinstance(state, dict):
+            for name, value in state.items():
+                set_field(self, name, value)
+        else:
+            super().__setstate__(state)
 
     def __post_init__(self) -> None:
         if self.flags is None:
