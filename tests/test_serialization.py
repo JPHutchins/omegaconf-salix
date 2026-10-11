@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 import yaml
 from pytest import mark, param, raises
+from salix import Struct
 
 from omegaconf import MISSING, DictConfig, ListConfig, Node, OmegaConf, UnionNode
 from omegaconf._utils import get_type_hint
@@ -173,6 +174,17 @@ class TestSaveLoadStructured:
         file_class: Type[Any],
     ) -> None:
         save_load_from_filename(input_, resolve, expected, file_class)
+
+
+class SalixPerson(Struct, frozen=False):
+    age: int = 18
+    registered: bool = True
+
+
+@mark.parametrize("input_", [SalixPerson, SalixPerson()])
+def test_save_load_salix_struct(input_: Any) -> None:
+    save_load_from_file(input_, False, {"age": 18, "registered": True})
+    save_load_from_filename(input_, False, {"age": 18, "registered": True}, str)
 
 
 def test_save_illegal_type() -> None:

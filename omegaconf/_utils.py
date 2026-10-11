@@ -28,6 +28,7 @@ from typing import (
 import yaml
 from salix import MISSING as SALIX_MISSING
 from salix import Field as SalixField
+from salix import Struct
 from salix import fields as salix_fields
 
 from .errors import (
@@ -740,8 +741,7 @@ def is_struct(obj: Any) -> bool:
 
     if isinstance(obj, Node):
         return False
-    cls = obj if isinstance(obj, type) else type(obj)
-    return hasattr(cls, "__struct_fields__")
+    return issubclass(get_type_of(obj), Struct)
 
 
 def is_structured_config(obj: Any) -> bool:
@@ -759,8 +759,12 @@ def is_attr_frozen(type_: type) -> bool:
     return type_.__setattr__ == attr._make._frozen_setattrs  # type: ignore
 
 
+class _FrozenStructProbe(Struct, frozen=True):
+    pass
+
+
 def is_struct_frozen(type_: type) -> bool:
-    return type_.__setattr__ is not object.__setattr__
+    return type_.__setattr__ is _FrozenStructProbe.__setattr__
 
 
 def get_type_of(class_or_object: Any) -> Type[Any]:

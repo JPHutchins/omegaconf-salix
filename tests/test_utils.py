@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import attr
 from pytest import mark, param, raises
+from salix import Struct
 
 from omegaconf import DictConfig, ListConfig, Node, OmegaConf, UnionNode, _utils
 from omegaconf._utils import (  # _normalize_ref_type,
@@ -464,6 +465,47 @@ def test_is_attr_class(mocker: Any) -> None:
     assert not _utils.is_attr_class(10)
     mocker.patch("omegaconf._utils.attr", None)
     assert not _utils.is_attr_class(10)
+
+
+class FrozenStruct(Struct, frozen=True):
+    x: int = 1
+
+
+class MutableStruct(Struct, frozen=False):
+    x: int = 1
+
+
+class MutableStructWithSetattrHook(Struct, frozen=False):
+    x: int = 1
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        object.__setattr__(self, name, value)
+
+
+class FrozenStructSubclass(FrozenStruct):
+    pass
+
+
+@mark.parametrize(
+    "type_,expected",
+    [
+        (FrozenStruct, True),
+        (FrozenStructSubclass, True),
+        (MutableStruct, False),
+        (MutableStructWithSetattrHook, False),
+    ],
+)
+def test_is_struct_frozen(type_: Any, expected: bool) -> None:
+    assert _utils.is_struct(type_)
+    assert _utils.is_struct(type_())
+    assert _utils.is_struct_frozen(type_) is expected
+    assert _utils.is_structured_config_frozen(type_) is expected
+    assert _utils.is_structured_config_frozen(type_()) is expected
+
+
+def test_is_struct_rejects_non_structs() -> None:
+    assert not _utils.is_struct(10)
+    assert not _utils.is_struct(Dataclass)
 
 
 def test_is_structured_config_frozen_with_invalid_obj() -> None:

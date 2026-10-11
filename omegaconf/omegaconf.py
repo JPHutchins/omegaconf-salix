@@ -49,6 +49,7 @@ from ._utils import (
     get_omega_conf_dumper,
     get_type_of,
     is_attr_class,
+    is_struct,
     is_dataclass,
     is_dict_annotation,
     is_int,
@@ -473,7 +474,7 @@ class OmegaConf:
         :param f: filename or file object
         :param resolve: True to save a resolved config (defaults to False)
         """
-        if is_dataclass(config) or is_attr_class(config):
+        if is_dataclass(config) or is_attr_class(config) or is_struct(config):
             config = OmegaConf.create(config)
         data = OmegaConf.to_yaml(config, resolve=resolve)
         if isinstance(f, (str, pathlib.Path)):
