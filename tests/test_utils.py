@@ -1,4 +1,6 @@
+import os
 import re
+import subprocess
 import sys
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -463,8 +465,24 @@ def test_is_attr_class(mocker: Any) -> None:
     assert _utils.is_attr_class(Foo())
 
     assert not _utils.is_attr_class(10)
-    mocker.patch("omegaconf._utils.attr", None)
-    assert not _utils.is_attr_class(10)
+    mocker.patch.dict(sys.modules, {"attr": None})
+    assert not _utils.is_attr_class(Foo)
+
+
+def test_importing_omegaconf_imports_neither_attr_nor_dataclasses() -> None:
+    probe = (
+        "import sys\n"
+        "import omegaconf\n"
+        "print(sorted(name for name in ('attr', 'dataclasses') if name in sys.modules))\n"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        check=True,
+        env={"PYTHONPATH": os.pathsep.join(sys.path)},
+    )
+    assert completed.stdout.strip() == "[]"
 
 
 class FrozenStruct(Struct, frozen=True):

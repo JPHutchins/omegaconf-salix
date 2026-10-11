@@ -1,5 +1,4 @@
 import copy
-import dataclasses
 import os
 import pathlib
 import re
@@ -42,12 +41,6 @@ from .errors import (
 from .grammar_parser import SIMPLE_INTERPOLATION_PATTERN, parse
 
 try:
-    import attr
-
-except ImportError:  # pragma: no cover
-    attr = None  # type: ignore # pragma: no cover
-
-try:
     from yaml import CDumper
 
     BaseDumper = CDumper
@@ -55,6 +48,8 @@ except ImportError:  # pragma: no cover
     BaseDumper = yaml.Dumper
 
 if TYPE_CHECKING:
+    import dataclasses
+
     import attr
     from attr import Attribute as AttrAttribute
 
@@ -536,7 +531,8 @@ def extract_dict_subclass_data(obj: Any, parent: Any) -> Optional[Dict[str, Any]
 
 
 def get_attr_class_fields(obj: Any) -> List["AttrAttribute[Any]"]:
-    assert attr is not None  # help type-checkers
+    import attr
+
     is_type = isinstance(obj, type)
     obj_type = obj if is_type else type(obj)
     fields = attr.fields_dict(obj_type).values()
@@ -548,6 +544,8 @@ def get_attr_data(
     allow_objects: Optional[bool] = None,
     parent: Optional["BaseContainer"] = None,
 ) -> Dict[str, Any]:
+    import attr
+
     from omegaconf.base import Node
     from omegaconf.omegaconf import OmegaConf, _maybe_wrap
 
@@ -617,6 +615,8 @@ def get_attr_data(
 
 
 def get_dataclass_fields(obj: Any) -> List["dataclasses.Field[Any]"]:
+    import dataclasses
+
     fields = dataclasses.fields(obj)
     return [f for f in fields if f.metadata.get("omegaconf_ignore") is not True]
 
@@ -626,6 +626,8 @@ def get_dataclass_data(
     allow_objects: Optional[bool] = None,
     parent: Optional["BaseContainer"] = None,
 ) -> Dict[str, Any]:
+    import dataclasses
+
     from omegaconf.omegaconf import MISSING
 
     def class_value(field: "dataclasses.Field[Any]") -> Any:
@@ -723,6 +725,9 @@ def is_dataclass(obj: Any) -> bool:
 
     if isinstance(obj, Node):
         return False
+    dataclasses = sys.modules.get("dataclasses")
+    if dataclasses is None:
+        return False
     is_dataclass = dataclasses.is_dataclass(obj)
     assert isinstance(is_dataclass, bool)
     return is_dataclass
@@ -731,9 +736,10 @@ def is_dataclass(obj: Any) -> bool:
 def is_attr_class(obj: Any) -> bool:
     from omegaconf.base import Node
 
+    attr = sys.modules.get("attr")
     if attr is None or isinstance(obj, Node):
         return False
-    return attr.has(obj)
+    return bool(attr.has(obj))
 
 
 def is_struct(obj: Any) -> bool:
@@ -753,6 +759,8 @@ def is_dataclass_frozen(type_: Any) -> bool:
 
 
 def is_attr_frozen(type_: type) -> bool:
+    import attr
+
     # This is very hacky and probably fragile as well.
     # Unfortunately currently there isn't an official API in attr that can detect that.
     # noinspection PyProtectedMember
